@@ -16,7 +16,7 @@
 (function(window){
 "use strict";
 
-var CLIENT_ID = "25254320096-567q7j3pvp4m7g3kptih57i5ieusa2ut.apps.googleusercontent.com";
+var CLIENT_ID = "85452020560-b90ouecps78mn0rjobc1on60c55eek86.apps.googleusercontent.com";
 var DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 var BACKUP_FOLDER_NAME = "Backup Rugby U14 - Pasian di Prato";
 
