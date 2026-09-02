@@ -1,0 +1,19 @@
+{
+  "name": "Rugby U14 - Pasian di Prato",
+  "short_name": "Rugby U14",
+  "description": "Schede Valutazione e Autovalutazione Rugby U14 - Rugby Club Pasian di Prato",
+  "id": "/rugby-u14-pasian/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "it",
+  "background_color": "#F2EFE6",
+  "theme_color": "#004860",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
