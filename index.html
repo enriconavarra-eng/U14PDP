@@ -60,6 +60,16 @@ body{
 .card-text h2{font-family:var(--font-display);font-size:17px;margin:0 0 3px 0;}
 .card-text p{margin:0;font-size:12.5px;color:var(--ink-soft);line-height:1.4;}
 
+.season-card{width:100%;max-width:420px;background:var(--surface);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-lg);border:1px solid var(--pitch-line);margin-bottom:18px;}
+.season-card label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px;}
+.season-card select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:15px;font-weight:600;color:var(--ink);margin-bottom:12px;}
+.season-card .row{display:flex;gap:8px;}
+.season-card .row button{flex:1;padding:11px;border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer;border:none;}
+.season-card .go-btn{background:var(--pitch);color:#fff;}
+.season-card .new-btn{background:var(--surface-2);color:var(--pitch-dark);border:1px solid var(--pitch-line)!important;}
+.secondary-links{display:flex;gap:10px;width:100%;max-width:420px;margin-top:4px;}
+.secondary-links a{flex:1;text-align:center;text-decoration:none;background:var(--surface);color:var(--pitch-dark);border:1px solid var(--pitch-line);padding:11px 8px;border-radius:10px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow);}
+
 .install-hint{
   margin-top:32px;max-width:420px;background:var(--gold-soft);color:var(--pitch-dark);
   border-radius:12px;padding:14px 16px;font-size:12.5px;line-height:1.5;text-align:center;
@@ -74,12 +84,25 @@ body{
     <p>Rugby Club Pasian di Prato</p>
   </div>
 
-  <div class="cards">
+  <div class="season-card">
+    <label>Annata sportiva</label>
+    <select id="seasonSelect"></select>
+    <div class="row">
+      <button class="go-btn" id="goSquadraBtn">&#128101; Vai alla Rosa</button>
+      <button class="new-btn" id="newSeasonBtn">+ Nuova</button>
+    </div>
+  </div>
+
+  <div class="secondary-links">
+    <a href="./riepilogo/">&#128202; Riepilogo Squadra</a>
+  </div>
+
+  <div class="cards" style="margin-top:16px;">
     <a class="card-link" href="./valutazione/">
       <div class="card-icon">&#128203;</div>
       <div class="card-text">
         <h2>Scheda Valutazione</h2>
-        <p>Per l'allenatore: dati giocatore, valutazione tecnica e riepilogo.</p>
+        <p>Per l'allenatore: valutazione tecnica e riepilogo per giocatore.</p>
       </div>
     </a>
     <a class="card-link" href="./autovalutazione/">
@@ -97,7 +120,31 @@ body{
 
   <div class="footer-note">I dati restano sul tablet. Usa "Backup su Drive" nelle singole schede per salvarli anche su Google Drive.</div>
 
+<script src="./assets/squadra-store.js"></script>
 <script>
+(function(){
+  var SS = window.SquadraStore;
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function renderSeasons(){
+    var sel = document.getElementById('seasonSelect');
+    var activeId = SS.getActiveSeasonId();
+    sel.innerHTML = SS.getSeasons().map(function(s){
+      return '<option value="'+s.id+'"'+(s.id===activeId?' selected':'')+'>'+escapeHtml(s.label)+'</option>';
+    }).join('');
+  }
+  document.getElementById('seasonSelect').addEventListener('change', function(e){ SS.setActiveSeasonId(e.target.value); });
+  document.getElementById('goSquadraBtn').addEventListener('click', function(){
+    window.location.href = './squadra/?season=' + encodeURIComponent(SS.getActiveSeasonId());
+  });
+  document.getElementById('newSeasonBtn').addEventListener('click', function(){
+    var label = prompt('Nome della nuova stagione (es. ' + SS.currentSeasonLabel() + '):', SS.currentSeasonLabel());
+    if(!label) return;
+    SS.addSeason(label.trim());
+    renderSeasons();
+  });
+  renderSeasons();
+})();
+
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('./service-worker.js').catch(function(err){

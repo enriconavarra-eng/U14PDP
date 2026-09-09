@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#004860">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Squadra — Rugby U14</title>
+<style>
+:root{
+  --bg:#F2EFE6; --surface:#FFFFFF; --surface-2:#F6F3EC;
+  --ink:#12232A; --ink-soft:#51666D;
+  --pitch:#004860; --pitch-dark:#00212F; --pitch-line:#DDD1B8;
+  --gold:#7C6650; --gold-soft:#EDE4D2;
+  --low:#B5533C; --mid:#B8701F; --high:#2E8F72;
+  --shadow: 0 2px 10px rgba(18,35,42,0.08);
+  --shadow-lg: 0 12px 32px rgba(18,35,42,0.16);
+  --radius: 14px;
+  --font-display: 'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif;
+  --font-body: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono: 'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{font-family:var(--font-body);background:radial-gradient(circle at 100% 0%, rgba(0,72,96,0.07), transparent 45%),var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent;}
+button{font-family:inherit;}
+input,select,textarea{font-family:inherit;}
+
+.topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;background:linear-gradient(135deg,var(--pitch) 0%, var(--pitch-dark) 100%);color:#fff;box-shadow:var(--shadow);}
+.topbar .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.topbar .brand img{height:34px;width:auto;flex-shrink:0;}
+.topbar h1{font-family:var(--font-display);font-weight:700;font-size:20px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.topbar button{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:9px 12px;border-radius:10px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+.topbar button:hover{background:rgba(255,255,255,0.22);}
+
+.main{max-width:920px;margin:0 auto;padding:22px 20px 60px 20px;}
+
+.season-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:20px;}
+.season-bar label{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;}
+.season-bar select{padding:9px 12px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:14.5px;color:var(--ink);}
+.season-bar button{padding:9px 12px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;}
+.season-bar button:hover{background:var(--gold-soft);}
+.season-bar .spacer{flex:1;}
+.riepilogo-link{background:var(--pitch)!important;color:#fff!important;border-color:var(--pitch)!important;}
+
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+.player-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px;}
+.player-card .head{display:flex;align-items:center;gap:12px;}
+.avatar{width:52px;height:52px;border-radius:50%;background:var(--pitch);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:17px;flex-shrink:0;background-size:cover;background-position:center;}
+.player-card h3{margin:0;font-size:15.5px;}
+.player-card .sub{font-size:12px;color:var(--ink-soft);}
+.player-card .links{display:flex;flex-wrap:wrap;gap:6px;}
+.player-card .links a{flex:1;min-width:104px;text-align:center;text-decoration:none;background:var(--surface-2);color:var(--pitch-dark);border:1px solid var(--pitch-line);padding:8px 8px;border-radius:8px;font-size:12px;font-weight:600;}
+.player-card .links a:hover{background:var(--gold-soft);}
+.player-card .row2{display:flex;gap:6px;}
+.player-card .row2 button{flex:1;padding:8px;border-radius:8px;border:1px solid var(--pitch-line);background:transparent;font-size:12px;cursor:pointer;color:var(--ink-soft);}
+.player-card .row2 .del{color:var(--low);border-color:var(--low);}
+.player-card .row2 button:hover{background:var(--gold-soft);}
+
+.add-card{border:1.5px dashed var(--pitch);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;min-height:140px;background:transparent;color:var(--pitch-dark);font-weight:600;font-size:14px;cursor:pointer;}
+.add-card:hover{background:var(--gold-soft);}
+
+.empty-msg{text-align:center;color:var(--ink-soft);padding:40px 16px;}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(20,30,20,0.45);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;overflow-y:auto;}
+.modal-backdrop.hidden{display:none;}
+.modal{background:#fff;border-radius:var(--radius);padding:22px;max-width:460px;width:100%;box-shadow:var(--shadow-lg);margin:auto;}
+.modal h3{font-family:var(--font-display);margin-top:0;}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.field label{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;}
+.field input,.field select,.field textarea{padding:10px 12px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:14.5px;color:var(--ink);}
+.field textarea{resize:vertical;min-height:60px;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.player-photo-wrap{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
+.player-photo{width:76px;height:76px;border-radius:50%;background:var(--surface-2);border:2px solid var(--pitch-line);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);font-family:var(--font-mono);font-weight:700;font-size:22px;flex-shrink:0;overflow:hidden;}
+.photo-actions{display:flex;flex-wrap:wrap;gap:8px;}
+.photo-actions button{padding:8px 12px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;}
+.photo-actions .remove-photo-btn{color:var(--low);border-color:var(--low);background:transparent;}
+.roles-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;}
+.role-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:12.5px;cursor:pointer;}
+.role-chip input{margin:0;accent-color:var(--pitch);}
+.role-chip.checked{border-color:var(--pitch);background:var(--gold-soft);font-weight:600;}
+.modal-actions{display:flex;gap:10px;margin-top:6px;justify-content:flex-end;}
+.modal-actions button{padding:10px 18px;border-radius:9px;border:none;font-size:13.5px;font-weight:600;cursor:pointer;}
+.modal-actions .cancel{background:var(--surface-2);color:var(--ink);}
+.modal-actions .confirm{background:var(--pitch);color:#fff;}
+.modal-actions .confirm.delete{background:var(--low);}
+.hidden{display:none !important;}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow-lg);transition:transform .25s ease;z-index:300;max-width:90vw;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <img src="../icons/icon-192.png" alt="Rugby Club Pasian di Prato">
+    <h1>Squadra</h1>
+  </div>
+  <div class="actions">
+    <button onclick="window.location.href='../'">&#8962; Home</button>
+    <button id="driveBackupBtn">&#9729; Drive</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="season-bar">
+    <label>Annata sportiva</label>
+    <select id="seasonSelect"></select>
+    <button id="newSeasonBtn">+ Nuova stagione</button>
+    <button id="renameSeasonBtn">Rinomina</button>
+    <div class="spacer"></div>
+    <button class="riepilogo-link" onclick="goRiepilogo()">&#128202; Riepilogo Squadra</button>
+  </div>
+
+  <div id="rosterGrid" class="roster-grid"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop hidden" id="playerModalBackdrop">
+  <div class="modal">
+    <h3 id="playerModalTitle">Nuovo giocatore</h3>
+    <div class="player-photo-wrap">
+      <div class="player-photo" id="photoPreview"></div>
+      <div class="photo-actions">
+        <input type="file" id="fFotoCarica" accept="image/*" class="hidden">
+        <input type="file" id="fFotoScatta" accept="image/*" capture="environment" class="hidden">
+        <button type="button" id="fFotoCaricaBtn">&#128193; Carica foto</button>
+        <button type="button" id="fFotoScattaBtn">&#128247; Scatta foto</button>
+        <button type="button" id="fFotoRemoveBtn" class="remove-photo-btn hidden">Rimuovi foto</button>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Nome e Cognome</label><input type="text" id="fNome"></div>
+      <div class="field"><label>Anno di nascita</label><input type="number" id="fAnno" placeholder="Es: 2012"></div>
+    </div>
+    <div class="field">
+      <label>Ruoli</label>
+      <div class="roles-grid" id="rolesGrid"></div>
+    </div>
+    <div class="field">
+      <label>Ruolo prevalente</label>
+      <select id="fRuoloPrevalente"></select>
+    </div>
+    <div class="field"><label>Note</label><textarea id="fNote"></textarea></div>
+    <div class="modal-actions">
+      <button class="cancel" id="playerModalCancel">Annulla</button>
+      <button class="confirm" id="playerModalSave">Salva</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="confirmBackdrop">
+  <div class="modal">
+    <h3 id="confirmTitle">Conferma</h3>
+    <p id="confirmText"></p>
+    <div class="modal-actions">
+      <button class="cancel" id="confirmCancel">Annulla</button>
+      <button class="confirm delete" id="confirmOk">Conferma</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/squadra-store.js"></script>
+<script src="../assets/drive-backup.js"></script>
+<script>
+(function(){
+"use strict";
+var SS = window.SquadraStore;
+var qs = new URLSearchParams(window.location.search);
+
+function getSeasonId(){
+  var fromUrl = qs.get('season');
+  if(fromUrl){ SS.setActiveSeasonId(fromUrl); }
+  return SS.getActiveSeasonId();
+}
+
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t=setTimeout(function(){t.classList.remove('show');},2600);
+}
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function confirmModal(title, text, onOk){
+  var backdrop=document.getElementById('confirmBackdrop');
+  document.getElementById('confirmTitle').textContent=title;
+  document.getElementById('confirmText').textContent=text;
+  backdrop.classList.remove('hidden');
+  var okBtn=document.getElementById('confirmOk'), cancelBtn=document.getElementById('confirmCancel');
+  function cleanup(){ backdrop.classList.add('hidden'); okBtn.removeEventListener('click',go); cancelBtn.removeEventListener('click',cancel); }
+  function go(){ cleanup(); onOk(); }
+  function cancel(){ cleanup(); }
+  okBtn.addEventListener('click',go);
+  cancelBtn.addEventListener('click',cancel);
+}
+
+function goRiepilogo(){ window.location.href = '../riepilogo/?season='+encodeURIComponent(getSeasonId()); }
+window.goRiepilogo = goRiepilogo;
+
+/* ---------------- Stagioni ---------------- */
+function renderSeasons(){
+  var sel = document.getElementById('seasonSelect');
+  var seasons = SS.getSeasons();
+  var activeId = getSeasonId();
+  sel.innerHTML = seasons.map(function(s){
+    return '<option value="'+s.id+'"'+(s.id===activeId?' selected':'')+'>'+escapeHtml(s.label)+'</option>';
+  }).join('');
+}
+document.getElementById('seasonSelect').addEventListener('change', function(e){
+  SS.setActiveSeasonId(e.target.value);
+  var url = new URL(window.location.href); url.searchParams.set('season', e.target.value);
+  window.history.replaceState(null,'',url);
+  renderRoster();
+});
+document.getElementById('newSeasonBtn').addEventListener('click', function(){
+  var label = prompt('Nome della nuova stagione (es. 2027/2028):', SS.currentSeasonLabel());
+  if(!label) return;
+  var s = SS.addSeason(label.trim());
+  renderSeasons(); renderRoster();
+  showToast('Stagione "'+s.label+'" creata.');
+});
+document.getElementById('renameSeasonBtn').addEventListener('click', function(){
+  var id = getSeasonId();
+  var season = SS.getSeasons().find(function(s){return s.id===id;});
+  if(!season) return;
+  var label = prompt('Nuovo nome stagione:', season.label);
+  if(!label) return;
+  SS.renameSeason(id, label.trim());
+  renderSeasons();
+  showToast('Stagione rinominata.');
+});
+
+/* ---------------- Rosa ---------------- */
+function renderRoster(){
+  var seasonId = getSeasonId();
+  var players = SS.getPlayers(seasonId);
+  var grid = document.getElementById('rosterGrid');
+  var html = players.map(playerCardHtml).join('');
+  html += '<button class="add-card" id="addPlayerCard">&#43; Nuovo giocatore</button>';
+  grid.innerHTML = html;
+  document.getElementById('addPlayerCard').addEventListener('click', function(){ openPlayerModal(null); });
+  Array.prototype.forEach.call(grid.querySelectorAll('[data-edit]'), function(btn){
+    btn.addEventListener('click', function(){ openPlayerModal(btn.getAttribute('data-edit')); });
+  });
+  Array.prototype.forEach.call(grid.querySelectorAll('[data-del]'), function(btn){
+    btn.addEventListener('click', function(){
+      var id = btn.getAttribute('data-del');
+      var p = SS.getPlayer(id);
+      confirmModal('Eliminare giocatore?', 'Questa azione rimuovera\' definitivamente "'+p.nome+'" dalla rosa e tutte le sue valutazioni/autovalutazioni.', function(){
+        SS.deletePlayer(id);
+        renderRoster();
+        showToast('Giocatore eliminato.');
+      });
+    });
+  });
+}
+function playerCardHtml(p){
+  var seasonId = getSeasonId();
+  var avatar = p.foto
+    ? '<div class="avatar" style="background-image:url(&quot;'+p.foto+'&quot;)"></div>'
+    : '<div class="avatar">'+(SS.getInitials(p.nome)||'?')+'</div>';
+  var sub = [p.ruoloPrevalente, p.annoNascita?('Nato nel '+p.annoNascita):''].filter(Boolean).join(' &middot; ');
+  var qp = '?player='+encodeURIComponent(p.id)+'&season='+encodeURIComponent(seasonId);
+  return '<div class="player-card">'+
+    '<div class="head">'+avatar+'<div><h3>'+escapeHtml(p.nome)+'</h3><div class="sub">'+sub+'</div></div></div>'+
+    '<div class="links">'+
+      '<a href="../valutazione/'+qp+'">&#128203; Valutazione</a>'+
+      '<a href="../autovalutazione/'+qp+'">&#128100; Autovalutazione</a>'+
+      '<a href="../confronto/'+qp+'">&#9878; Confronto</a>'+
+    '</div>'+
+    '<div class="row2">'+
+      '<button data-edit="'+p.id+'">&#9998; Modifica</button>'+
+      '<button class="del" data-del="'+p.id+'">&#128465; Elimina</button>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ---------------- Modale giocatore ---------------- */
+var editingId = null;
+var editingFoto = '';
+
+function openPlayerModal(id){
+  editingId = id;
+  var p = id ? SS.getPlayer(id) : { nome:'', annoNascita:'', foto:'', ruoli:[], ruoloPrevalente:'', note:'' };
+  editingFoto = p.foto || '';
+  document.getElementById('playerModalTitle').textContent = id ? 'Modifica giocatore' : 'Nuovo giocatore';
+  document.getElementById('fNome').value = p.nome || '';
+  document.getElementById('fAnno').value = p.annoNascita || '';
+  document.getElementById('fNote').value = p.note || '';
+  renderPhotoPreview();
+
+  var rolesGrid = document.getElementById('rolesGrid');
+  rolesGrid.innerHTML = SS.ROLES_LIST.map(function(r){
+    var checked = p.ruoli && p.ruoli.indexOf(r)!==-1;
+    return '<label class="role-chip'+(checked?' checked':'')+'"><input type="checkbox" value="'+r+'" '+(checked?'checked':'')+'> '+r+'</label>';
+  }).join('');
+  Array.prototype.forEach.call(rolesGrid.querySelectorAll('input'), function(chk){
+    chk.addEventListener('change', function(){
+      chk.closest('.role-chip').classList.toggle('checked', chk.checked);
+      updateRuoloPrevalenteOptions();
+    });
+  });
+  updateRuoloPrevalenteOptions(p.ruoloPrevalente);
+
+  document.getElementById('playerModalBackdrop').classList.remove('hidden');
+  setTimeout(function(){ document.getElementById('fNome').focus(); }, 50);
+}
+function selectedRoles(){
+  return Array.prototype.map.call(document.querySelectorAll('#rolesGrid input:checked'), function(c){return c.value;});
+}
+function updateRuoloPrevalenteOptions(preferred){
+  var roles = selectedRoles();
+  var sel = document.getElementById('fRuoloPrevalente');
+  var current = preferred || sel.value;
+  sel.innerHTML = roles.length===0
+    ? '<option value="">Seleziona almeno un ruolo</option>'
+    : roles.map(function(r){ return '<option'+(r===current?' selected':'')+'>'+r+'</option>'; }).join('');
+  sel.disabled = roles.length===0;
+}
+function renderPhotoPreview(){
+  var el = document.getElementById('photoPreview');
+  var removeBtn = document.getElementById('fFotoRemoveBtn');
+  if(editingFoto){
+    el.style.backgroundImage = 'url("'+editingFoto+'")';
+    el.textContent = '';
+    removeBtn.classList.remove('hidden');
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = document.getElementById('fNome').value ? (SS.getInitials(document.getElementById('fNome').value)||'?') : '?';
+    removeBtn.classList.add('hidden');
+  }
+}
+document.getElementById('fNome').addEventListener('input', function(){ if(!editingFoto) renderPhotoPreview(); });
+document.getElementById('fFotoCaricaBtn').addEventListener('click', function(){ document.getElementById('fFotoCarica').click(); });
+document.getElementById('fFotoScattaBtn').addEventListener('click', function(){ document.getElementById('fFotoScatta').click(); });
+function handlePhotoFile(input){
+  var file = input.files[0];
+  input.value = '';
+  if(!file) return;
+  if(!/^image\//.test(file.type)){ showToast('Seleziona o scatta un\'immagine valida.'); return; }
+  SS.resizeImageFile(file, 320, 320, 0.85, function(dataUrl){
+    editingFoto = dataUrl; renderPhotoPreview();
+  }, function(){ showToast('Impossibile elaborare la foto.'); });
+}
+document.getElementById('fFotoCarica').addEventListener('change', function(){ handlePhotoFile(this); });
+document.getElementById('fFotoScatta').addEventListener('change', function(){ handlePhotoFile(this); });
+document.getElementById('fFotoRemoveBtn').addEventListener('click', function(){ editingFoto=''; renderPhotoPreview(); });
+
+document.getElementById('playerModalCancel').addEventListener('click', function(){
+  document.getElementById('playerModalBackdrop').classList.add('hidden');
+});
+document.getElementById('playerModalSave').addEventListener('click', function(){
+  var nome = document.getElementById('fNome').value.trim();
+  if(!nome){ showToast('Inserisci nome e cognome.'); return; }
+  var roles = selectedRoles();
+  var player = {
+    id: editingId || SS.uid(),
+    seasonId: getSeasonId(),
+    nome: nome,
+    annoNascita: document.getElementById('fAnno').value.trim(),
+    foto: editingFoto,
+    ruoli: roles,
+    ruoloPrevalente: document.getElementById('fRuoloPrevalente').value || '',
+    note: document.getElementById('fNote').value.trim()
+  };
+  SS.savePlayer(player);
+  document.getElementById('playerModalBackdrop').classList.add('hidden');
+  renderRoster();
+  showToast('Giocatore salvato.');
+});
+
+/* ---------------- Drive backup (rosa) ---------------- */
+document.getElementById('driveBackupBtn').addEventListener('click', function(){
+  var btn = this; var original = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '☁ Backup...';
+  var raw = localStorage.getItem('rugbyU14_squadra_v1') || '{}';
+  window.RugbyDriveBackup.backup(raw, 'backup_squadra.json', function(){
+    btn.disabled = false; btn.innerHTML = original;
+    showToast('Rosa salvata su Google Drive.');
+  }, function(err){
+    btn.disabled = false; btn.innerHTML = original;
+    showToast((err && err.message) ? err.message : 'Backup su Drive non riuscito.');
+  });
+});
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('../service-worker.js', {scope:'../'}).catch(function(){});
+}
+
+/* ---------------- Init ---------------- */
+renderSeasons();
+renderRoster();
+if(qs.get('new')==='1'){ openPlayerModal(null); }
+else if(qs.get('player') && qs.get('edit')==='1'){ openPlayerModal(qs.get('player')); }
+
+})();
+</script>
+</body>
+</html>

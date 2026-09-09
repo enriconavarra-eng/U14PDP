@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#004860">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Riepilogo Squadra — Rugby U14</title>
+<style>
+:root{
+  --bg:#F2EFE6; --surface:#FFFFFF; --surface-2:#F6F3EC;
+  --ink:#12232A; --ink-soft:#51666D;
+  --pitch:#004860; --pitch-dark:#00212F; --pitch-line:#DDD1B8;
+  --gold:#7C6650; --gold-soft:#EDE4D2;
+  --low:#B5533C; --mid:#B8701F; --high:#2E8F72;
+  --shadow: 0 2px 10px rgba(18,35,42,0.08);
+  --radius: 14px;
+  --font-display: 'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif;
+  --font-body: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono: 'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{font-family:var(--font-body);background:radial-gradient(circle at 100% 0%, rgba(0,72,96,0.07), transparent 45%),var(--bg);color:var(--ink);}
+button{font-family:inherit;}
+.topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;background:linear-gradient(135deg,var(--pitch) 0%, var(--pitch-dark) 100%);color:#fff;box-shadow:var(--shadow);}
+.topbar .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.topbar .brand img{height:34px;width:auto;}
+.topbar h1{font-family:var(--font-display);font-weight:700;font-size:20px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .actions{display:flex;gap:8px;flex-wrap:wrap;}
+.topbar button{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:9px 12px;border-radius:10px;font-size:13px;cursor:pointer;}
+.topbar button:hover{background:rgba(255,255,255,0.22);}
+
+.main{max-width:1000px;margin:0 auto;padding:22px 20px 60px 20px;}
+.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:20px;}
+.filters label{font-size:12.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.3px;}
+.filters select{padding:9px 12px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:14.5px;}
+.period-switch{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:10px;}
+.period-switch button{border:none;background:transparent;padding:8px 12px;border-radius:7px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+.period-switch button.active{background:var(--gold);color:#fff;}
+.filters .spacer{flex:1;}
+.pdf-squad-btn{background:var(--pitch)!important;color:#fff;border:none;padding:10px 16px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
+.pdf-squad-btn:hover{opacity:.92;}
+
+.table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:auto;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{padding:11px 12px;text-align:center;white-space:nowrap;}
+th{background:var(--pitch);color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0;}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:inherit;}
+tbody tr:nth-child(even){background:var(--surface-2);}
+td.mono{font-family:var(--font-mono);font-weight:700;}
+.name-cell{display:flex;align-items:center;gap:10px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--pitch);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:11px;background-size:cover;background-position:center;flex-shrink:0;}
+.pdf-btn{background:var(--surface-2);border:1px solid var(--pitch-line);color:var(--ink);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer;}
+.pdf-btn:hover{background:var(--gold-soft);}
+.empty-msg{text-align:center;color:var(--ink-soft);padding:40px 16px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <img src="../icons/icon-192.png" alt="Rugby Club Pasian di Prato">
+    <h1>Riepilogo Squadra</h1>
+  </div>
+  <div class="actions">
+    <button onclick="window.location.href='../squadra/'+window.location.search">&#128101; Squadra</button>
+    <button onclick="window.location.href='../'">&#8962; Home</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="filters">
+    <label>Stagione</label>
+    <select id="seasonSelect"></select>
+    <label>Periodo</label>
+    <div class="period-switch" id="periodSwitch"></div>
+    <div class="spacer"></div>
+    <button class="pdf-squad-btn" id="pdfSquadBtn">&#128424; Scarica PDF Squadra</button>
+  </div>
+
+  <div id="tableWrap"></div>
+</div>
+
+<script src="../assets/squadra-store.js"></script>
+<script src="../assets/eval-data.js"></script>
+<script src="../assets/report-builder.js"></script>
+<script>
+(function(){
+"use strict";
+var SS = window.SquadraStore;
+var ED = window.EvalData;
+var qs = new URLSearchParams(window.location.search);
+var state = { period: 'settembre' };
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fmt(v){ return (v===null||v===undefined) ? '-' : v.toFixed(1); }
+function scoreColor(v){ if(v===null||v===undefined) return '#999'; if(v<2) return '#B5533C'; if(v<3.5) return '#B8701F'; return '#2E8F72'; }
+
+function getSeasonId(){
+  var fromUrl = qs.get('season');
+  if(fromUrl){ SS.setActiveSeasonId(fromUrl); }
+  return SS.getActiveSeasonId();
+}
+
+function renderSeasons(){
+  var sel = document.getElementById('seasonSelect');
+  var activeId = getSeasonId();
+  sel.innerHTML = SS.getSeasons().map(function(s){
+    return '<option value="'+s.id+'"'+(s.id===activeId?' selected':'')+'>'+escapeHtml(s.label)+'</option>';
+  }).join('');
+  sel.addEventListener('change', function(e){
+    SS.setActiveSeasonId(e.target.value);
+    var url = new URL(window.location.href); url.searchParams.set('season', e.target.value);
+    window.history.replaceState(null,'',url);
+    renderTable();
+  });
+}
+function renderPeriods(){
+  var el = document.getElementById('periodSwitch');
+  el.innerHTML = ED.PERIODS.map(function(p){
+    return '<button data-period="'+p.key+'" class="'+(state.period===p.key?'active':'')+'">'+p.label+'</button>';
+  }).join('');
+  Array.prototype.forEach.call(el.querySelectorAll('button'), function(btn){
+    btn.addEventListener('click', function(){ state.period = btn.getAttribute('data-period'); renderPeriods(); renderTable(); });
+  });
+}
+
+function renderTable(){
+  var seasonId = getSeasonId();
+  var players = SS.getPlayers(seasonId);
+  var wrap = document.getElementById('tableWrap');
+  if(players.length===0){
+    wrap.innerHTML = '<div class="empty-msg">Nessun giocatore in questa stagione.<br>Aggiungili dalla pagina Squadra.</div>';
+    return;
+  }
+  var rows = players.map(function(p){
+    var valTot = ED.valTotalAverage(p.id, state.period);
+    var autoTot = ED.autoTotalAverage(p.id, state.period);
+    var avatar = p.foto ? '<div class="avatar" style="background-image:url(&quot;'+p.foto+'&quot;)"></div>' : '<div class="avatar">'+(SS.getInitials(p.nome)||'?')+'</div>';
+    return '<tr>'+
+      '<td><div class="name-cell">'+avatar+'<span>'+escapeHtml(p.nome)+'</span></div></td>'+
+      '<td class="mono" style="color:'+scoreColor(valTot)+'">'+fmt(valTot)+'</td>'+
+      '<td class="mono" style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</td>'+
+      '<td><button class="pdf-btn" data-id="'+p.id+'">&#128424; PDF</button></td>'+
+    '</tr>';
+  }).join('');
+  wrap.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Giocatore</th><th>Media Valutazione</th><th>Media Autovalutazione</th><th>Riepilogo</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  Array.prototype.forEach.call(wrap.querySelectorAll('.pdf-btn'), function(btn){
+    btn.addEventListener('click', function(){
+      var player = SS.getPlayer(btn.getAttribute('data-id'));
+      window.RugbyReport.openPlayerReport(player, state.period);
+    });
+  });
+}
+
+document.getElementById('pdfSquadBtn').addEventListener('click', function(){
+  var seasonId = getSeasonId();
+  var players = SS.getPlayers(seasonId);
+  var season = SS.getSeasons().find(function(s){return s.id===seasonId;});
+  window.RugbyReport.openSquadReport(players, state.period, season ? season.label : '');
+});
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('../service-worker.js', {scope:'../'}).catch(function(){});
+}
+
+renderSeasons();
+renderPeriods();
+renderTable();
+
+})();
+</script>
+</body>
+</html>

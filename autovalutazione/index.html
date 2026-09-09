@@ -59,6 +59,16 @@ input,select,textarea{font-family:inherit;}
 .sidebar .search-wrap input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:14px;color:var(--ink);}
 .sidebar .search-wrap input:focus{outline:2px solid var(--pitch);outline-offset:1px;}
 
+.season-select-wrap{margin:0 14px 10px 14px;}
+.season-select-wrap select{width:100%;padding:9px 10px;border-radius:9px;border:1px solid var(--pitch-line);background:var(--surface-2);font-size:13px;color:var(--ink);font-weight:600;}
+.readonly-card{background:var(--surface-2);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);margin-bottom:18px;}
+.readonly-card .rc-row{display:flex;justify-content:space-between;font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--pitch-line);}
+.readonly-card .rc-row:last-child{border-bottom:none;}
+.readonly-card .rc-row span:first-child{color:var(--ink-soft);font-weight:600;}
+.readonly-card .rc-edit-link{display:inline-block;margin-top:12px;background:var(--pitch);color:#fff;text-decoration:none;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:600;}
+.pdf-report-btn{background:var(--pitch);color:#fff;border:none;padding:10px 16px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:14px;display:inline-flex;align-items:center;gap:6px;}
+.pdf-report-btn:hover{opacity:.9;}
+
 .period-switch{display:flex;gap:4px;margin:0 14px 10px 14px;background:var(--surface-2);padding:4px;border-radius:10px;}
 .period-switch button{flex:1;border:none;background:transparent;padding:7px 4px;border-radius:7px;font-size:12px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
 .period-switch button.active{background:var(--gold);color:#fff;}
@@ -210,6 +220,9 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
     </div>
     <div class="subtitle" id="squadSubtitle"></div>
     <div class="actions">
+      <button id="squadraLinkBtn" title="Rosa squadra">&#128101; Squadra</button>
+      <button id="riepilogoLinkBtn" title="Riepilogo squadra">&#128202; Riepilogo</button>
+      <button id="confrontoLinkBtn" title="Confronto con la valutazione tecnica" class="hidden">&#9878; Confronto</button>
       <button id="homeLinkBtn" title="Torna alla Home" onclick="window.location.href='../'">&#8962; Home</button>
       <button id="driveBackupBtn" title="Backup su Google Drive">&#9729; Drive</button>
       <button id="exportBtn" title="Salva backup su file">&#128190; Backup</button>
@@ -222,6 +235,7 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
       <div class="search-wrap">
         <input type="text" id="searchInput" placeholder="Cerca giocatore...">
       </div>
+      <div class="season-select-wrap"><select id="seasonSelect"></select></div>
       <div class="period-switch" id="periodSwitch"></div>
       <button class="squad-view-btn active" id="squadViewBtn">&#128203; Vista Squadra</button>
       <button class="new-player-btn" id="newPlayerBtn">+ Nuovo giocatore</button>
@@ -243,6 +257,9 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
   </div>
 </div>
 
+<script src="../assets/squadra-store.js"></script>
+<script src="../assets/eval-data.js"></script>
+<script src="../assets/report-builder.js"></script>
 <script src="../assets/drive-backup.js"></script>
 <script>
 (function(){
@@ -336,6 +353,7 @@ function getCss(name){ return getComputedStyle(document.documentElement).getProp
    STATO E PERSISTENZA
 ============================================================ */
 var STORAGE_KEY = 'rugbyU14_autovalutazione_v1';
+var qs = new URLSearchParams(window.location.search);
 var state = {
   players: [],
   view: 'squad',
@@ -343,6 +361,7 @@ var state = {
   activeTab: 'scheda',
   radarMode: 'generale',
   activePeriod: 'settembre',
+  activeSeasonId: null,
   search: ''
 };
 
@@ -352,6 +371,25 @@ function loadData(){
     if(raw){ var parsed = JSON.parse(raw); state.players = parsed.players || []; }
   }catch(e){ console.error('Errore caricamento dati', e); }
   state.players.forEach(ensurePlayerShape);
+
+  if(qs.get('season')) window.SquadraStore.setActiveSeasonId(qs.get('season'));
+  state.activeSeasonId = window.SquadraStore.getActiveSeasonId();
+  window.SquadraStore.syncAppPlayers(state.players, state.activeSeasonId, {
+    richFields: false,
+    createLocal: function(sp){ return newPlayer(sp.nome, sp.id); }
+  });
+  state.players.forEach(ensurePlayerShape);
+
+  if(qs.get('player')){
+    state.view = 'player';
+    state.activePlayerId = qs.get('player');
+    state.activeTab = 'scheda';
+  }
+}
+function visiblePlayers(){
+  var rosterIds = {};
+  window.SquadraStore.getPlayers(state.activeSeasonId).forEach(function(p){ rosterIds[p.id]=true; });
+  return state.players.filter(function(p){ return rosterIds[p.id]; });
 }
 function saveData(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({players: state.players})); }
@@ -371,8 +409,8 @@ function ensurePlayerShape(p){
   return p;
 }
 function uid(){ return 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
-function newPlayer(nome){
-  var p = { id: uid(), nome: nome || 'Nuovo giocatore', annoNascita:'', foto:'', valutazioni:{} };
+function newPlayer(nome, id){
+  var p = { id: id || uid(), nome: nome || 'Nuovo giocatore', annoNascita:'', foto:'', valutazioni:{} };
   ensurePlayerShape(p);
   return p;
 }
@@ -528,7 +566,7 @@ function renderPeriodSwitch(){
 function renderSidebar(){
   var list=document.getElementById('playerList');
   var search=state.search.toLowerCase();
-  var players=state.players.filter(function(p){return p.nome.toLowerCase().indexOf(search)!==-1;}).sort(function(a,b){return a.nome.localeCompare(b.nome);});
+  var players=visiblePlayers().filter(function(p){return p.nome.toLowerCase().indexOf(search)!==-1;}).sort(function(a,b){return a.nome.localeCompare(b.nome);});
   document.getElementById('squadViewBtn').classList.toggle('active', state.view==='squad');
   if(players.length===0){ list.innerHTML='<div class="empty-list-msg">Nessun giocatore trovato.<br>Usa "+ Nuovo giocatore" per iniziare.</div>'; return; }
   list.innerHTML = players.map(function(p){
@@ -554,12 +592,16 @@ function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function
 /* ============================================================
    RENDER: MAIN
 ============================================================ */
-function renderAll(){ renderPeriodSwitch(); renderSidebar(); renderMain(); updateSubtitle(); saveData(); }
+function renderAll(){
+  renderSeasonSelect(); renderPeriodSwitch(); renderSidebar(); renderMain(); updateSubtitle(); saveData();
+  document.getElementById('confrontoLinkBtn').classList.toggle('hidden', state.view!=='player');
+}
 function updateSubtitle(){
-  var n=state.players.length; var sub=document.getElementById('squadSubtitle');
+  var players=visiblePlayers();
+  var n=players.length; var sub=document.getElementById('squadSubtitle');
   if(n===0){ sub.textContent=''; return; }
   var sum=0,c=0;
-  state.players.forEach(function(p){ var t=totalAverage(getScores(p)); if(t!==null){sum+=t;c++;} });
+  players.forEach(function(p){ var t=totalAverage(getScores(p)); if(t!==null){sum+=t;c++;} });
   var avg = c>0 ? (sum/c).toFixed(1) : '-';
   sub.textContent = n+' giocatori - '+periodLabel(state.activePeriod)+' - media squadra '+avg;
   sub.style.display='block';
@@ -576,10 +618,11 @@ function renderMain(){
 
 /* ---------- Vista Squadra ---------- */
 function renderSquadView(){
-  if(state.players.length===0){
-    return '<div class="welcome"><span class="ball-big">&#127945;</span><h2>Nessun giocatore</h2><p>Aggiungi il primo giocatore dalla barra laterale per iniziare l\'autovalutazione.</p></div>';
+  var squadPlayers = visiblePlayers();
+  if(squadPlayers.length===0){
+    return '<div class="welcome"><span class="ball-big">&#127945;</span><h2>Nessun giocatore</h2><p>Aggiungi il primo giocatore dalla pagina Squadra per iniziare l\'autovalutazione.</p></div>';
   }
-  var rows = state.players.slice().sort(function(a,b){return a.nome.localeCompare(b.nome);}).map(function(p){
+  var rows = squadPlayers.slice().sort(function(a,b){return a.nome.localeCompare(b.nome);}).map(function(p){
     var scores=getScores(p);
     var cells='<td>'+escapeHtml(p.nome)+'</td>';
     SKILL_GROUPS.forEach(function(g){ var a=groupAverage(scores,g); cells+='<td class="mono" style="color:'+scoreColor(a)+'">'+fmt(a)+'</td>'; });
@@ -622,21 +665,17 @@ function renderTabDati(player){
   var photoPreview = player.foto
     ? '<div class="player-photo" id="playerPhotoPreview" style="background-image:url(&quot;'+player.foto+'&quot;)"></div>'
     : '<div class="player-photo" id="playerPhotoPreview">'+(initials||'?')+'</div>';
+  var editUrl = '../squadra/?player='+encodeURIComponent(player.id)+'&season='+encodeURIComponent(state.activeSeasonId)+'&edit=1';
 
   return '<div class="card">'+
     '<div class="player-photo-wrap">'+
       photoPreview+
-      '<div class="photo-actions">'+
-        '<input type="file" id="fFotoCarica" accept="image/*" class="hidden">'+
-        '<input type="file" id="fFotoScatta" accept="image/*" capture="environment" class="hidden">'+
-        '<button type="button" id="fFotoCaricaBtn">&#128193; Carica foto</button>'+
-        '<button type="button" id="fFotoScattaBtn">&#128247; Scatta foto</button>'+
-        (player.foto ? '<button type="button" id="fFotoRemoveBtn" class="remove-photo-btn">Rimuovi foto</button>' : '')+
-      '</div>'+
+      '<div style="font-size:12.5px;color:var(--ink-soft);max-width:340px;">I dati anagrafici e la foto sono condivisi con la Scheda Valutazione e si modificano dalla pagina Squadra.</div>'+
     '</div>'+
-    '<div class="field-row">'+
-      '<div class="field"><label>Nome e Cognome</label><input type="text" id="fNome" value="'+escapeHtml(player.nome)+'"></div>'+
-      '<div class="field"><label>Anno di nascita</label><input type="number" id="fAnno" placeholder="Es: 2012" value="'+escapeHtml(player.annoNascita)+'"></div>'+
+    '<div class="readonly-card">'+
+      '<div class="rc-row"><span>Nome e Cognome</span><span>'+escapeHtml(player.nome)+'</span></div>'+
+      '<div class="rc-row"><span>Anno di nascita</span><span>'+(player.annoNascita?escapeHtml(player.annoNascita):'-')+'</span></div>'+
+      '<a class="rc-edit-link" href="'+editUrl+'">&#9998; Modifica in Squadra</a>'+
     '</div>'+
   '</div>';
 }
@@ -701,7 +740,8 @@ function renderTabRiepilogo(player){
       '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+g.color+'"></div></div></div>';
   }).join('');
 
-  return '<div class="summary-grid">'+
+  return '<button type="button" class="pdf-report-btn" id="pdfReportBtn">&#128424; Scarica PDF riepilogo</button>'+
+  '<div class="summary-grid">'+
     '<div class="card">'+
       '<div class="radar-toggle">'+
         '<button data-mode="generale" class="'+(state.radarMode==='generale'?'active':'')+'">Vista generale</button>'+
@@ -760,7 +800,8 @@ function attachPlayerEvents(player){
   var delBtn=document.getElementById('deletePlayerBtn');
   if(delBtn){
     delBtn.addEventListener('click', function(){
-      confirmModal('Eliminare giocatore?', 'Questa azione rimuovera definitivamente "'+player.nome+'" e tutte le sue autovalutazioni.', function(){
+      confirmModal('Eliminare giocatore?', 'Questa azione rimuovera\' definitivamente "'+player.nome+'" dalla rosa (Squadra) e tutte le sue valutazioni/autovalutazioni.', function(){
+        window.SquadraStore.deletePlayer(player.id);
         state.players = state.players.filter(function(p){return p.id!==player.id;});
         state.view='squad'; state.activePlayerId=null;
         renderAll(); showToast('Giocatore eliminato.');
@@ -769,53 +810,18 @@ function attachPlayerEvents(player){
   }
 
   if(state.activeTab==='scheda'){
-    var fNome=document.getElementById('fNome');
-    var fAnno=document.getElementById('fAnno');
-    fNome.addEventListener('input', function(){ player.nome=fNome.value; saveData(); renderSidebar(); updateSubtitle(); });
-    fAnno.addEventListener('input', function(){ player.annoNascita=fAnno.value; saveData(); renderSidebar(); });
-
-    var handlePhotoFile = function(fileInput){
-      var file = fileInput.files[0];
-      fileInput.value = '';
-      if(!file) return;
-      if(!/^image\//.test(file.type)){ showToast('Seleziona o scatta un\'immagine valida.'); return; }
-      resizeImageFile(file, 320, 320, 0.85, function(dataUrl){
-        player.foto = dataUrl;
-        saveData(); renderMain(); renderSidebar();
-        showToast('Foto salvata.');
-      }, function(){ showToast('Impossibile salvare la foto.'); });
-    };
-
-    var fFotoCaricaBtn = document.getElementById('fFotoCaricaBtn');
-    var fFotoCarica = document.getElementById('fFotoCarica');
-    var fFotoScattaBtn = document.getElementById('fFotoScattaBtn');
-    var fFotoScatta = document.getElementById('fFotoScatta');
-    var fFotoRemoveBtn = document.getElementById('fFotoRemoveBtn');
-
-    if(fFotoCaricaBtn && fFotoCarica){
-      fFotoCaricaBtn.addEventListener('click', function(){ fFotoCarica.click(); });
-      fFotoCarica.addEventListener('change', function(){ handlePhotoFile(fFotoCarica); });
-    }
-    if(fFotoScattaBtn && fFotoScatta){
-      fFotoScattaBtn.addEventListener('click', function(){ fFotoScatta.click(); });
-      fFotoScatta.addEventListener('change', function(){ handlePhotoFile(fFotoScatta); });
-    }
-    if(fFotoRemoveBtn){
-      fFotoRemoveBtn.addEventListener('click', function(){
-        confirmModal('Rimuovere foto?', 'La foto di "'+player.nome+'" verra rimossa dalla scheda.', function(){
-          player.foto = '';
-          saveData(); renderMain(); renderSidebar();
-          showToast('Foto rimossa.');
-        });
-      });
-    }
-
     Array.prototype.forEach.call(document.querySelectorAll('.radar-toggle button'), function(btn){
       btn.addEventListener('click', function(){ state.radarMode = btn.getAttribute('data-mode'); renderMain(); });
     });
     window.addEventListener('resize', debounce(function(){
       if(state.view==='player' && state.activeTab==='scheda'){ renderRadarForPlayer(player); }
     }, 200));
+    var pdfBtn = document.getElementById('pdfReportBtn');
+    if(pdfBtn){
+      pdfBtn.addEventListener('click', function(){
+        window.RugbyReport.openPlayerReport(window.SquadraStore.getPlayer(player.id) || player, state.activePeriod);
+      });
+    }
   }
 
   if(state.activeTab==='valutazione'){
@@ -858,13 +864,39 @@ function debounce(fn,ms){ var t; return function(){ clearTimeout(t); var args=ar
 ============================================================ */
 document.getElementById('squadViewBtn').addEventListener('click', function(){ state.view='squad'; state.activePlayerId=null; renderAll(); });
 document.getElementById('newPlayerBtn').addEventListener('click', function(){
-  var p = newPlayer('Nuovo giocatore');
-  state.players.push(p);
-  state.view='player'; state.activePlayerId=p.id; state.activeTab='scheda';
-  renderAll();
-  setTimeout(function(){ var el=document.getElementById('fNome'); if(el){ el.focus(); el.select(); } }, 50);
+  window.location.href = '../squadra/?season='+encodeURIComponent(state.activeSeasonId)+'&new=1';
 });
 document.getElementById('searchInput').addEventListener('input', function(e){ state.search=e.target.value; renderSidebar(); });
+
+document.getElementById('squadraLinkBtn').addEventListener('click', function(){
+  window.location.href = '../squadra/?season='+encodeURIComponent(state.activeSeasonId);
+});
+document.getElementById('riepilogoLinkBtn').addEventListener('click', function(){
+  window.location.href = '../riepilogo/?season='+encodeURIComponent(state.activeSeasonId);
+});
+document.getElementById('confrontoLinkBtn').addEventListener('click', function(){
+  if(!state.activePlayerId) return;
+  window.location.href = '../confronto/?player='+encodeURIComponent(state.activePlayerId)+'&season='+encodeURIComponent(state.activeSeasonId);
+});
+
+function renderSeasonSelect(){
+  var sel = document.getElementById('seasonSelect');
+  var seasons = window.SquadraStore.getSeasons();
+  sel.innerHTML = seasons.map(function(s){
+    return '<option value="'+s.id+'"'+(s.id===state.activeSeasonId?' selected':'')+'>'+escapeHtml(s.label)+'</option>';
+  }).join('');
+}
+document.getElementById('seasonSelect').addEventListener('change', function(e){
+  state.activeSeasonId = e.target.value;
+  window.SquadraStore.setActiveSeasonId(e.target.value);
+  window.SquadraStore.syncAppPlayers(state.players, state.activeSeasonId, {
+    richFields: false,
+    createLocal: function(sp){ return newPlayer(sp.nome, sp.id); }
+  });
+  state.players.forEach(ensurePlayerShape);
+  state.view='squad'; state.activePlayerId=null;
+  renderAll();
+});
 
 document.getElementById('exportBtn').addEventListener('click', function(){
   var data = JSON.stringify({players: state.players}, null, 2);

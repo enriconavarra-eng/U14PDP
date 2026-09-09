@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#004860">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Confronto — Rugby U14</title>
+<style>
+:root{
+  --bg:#F2EFE6; --surface:#FFFFFF; --surface-2:#F6F3EC;
+  --ink:#12232A; --ink-soft:#51666D;
+  --pitch:#004860; --pitch-dark:#00212F; --pitch-line:#DDD1B8;
+  --gold:#7C6650; --gold-soft:#EDE4D2;
+  --low:#B5533C; --mid:#B8701F; --high:#2E8F72;
+  --shadow: 0 2px 10px rgba(18,35,42,0.08);
+  --radius: 14px;
+  --font-display: 'Iowan Old Style','Palatino Linotype','Book Antiqua',Georgia,serif;
+  --font-body: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font-mono: 'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{font-family:var(--font-body);background:radial-gradient(circle at 100% 0%, rgba(0,72,96,0.07), transparent 45%),var(--bg);color:var(--ink);}
+button{font-family:inherit;}
+.topbar{display:flex;align-items:center;gap:16px;padding:14px 20px;background:linear-gradient(135deg,var(--pitch) 0%, var(--pitch-dark) 100%);color:#fff;box-shadow:var(--shadow);}
+.topbar .brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+.topbar .brand img{height:34px;width:auto;}
+.topbar h1{font-family:var(--font-display);font-weight:700;font-size:20px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar .actions{display:flex;gap:8px;flex-wrap:wrap;}
+.topbar button{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.28);color:#fff;padding:9px 12px;border-radius:10px;font-size:13px;cursor:pointer;}
+.topbar button:hover{background:rgba(255,255,255,0.22);}
+
+.main{max-width:760px;margin:0 auto;padding:22px 20px 60px 20px;}
+.player-header{display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+.avatar-lg{width:64px;height:64px;border-radius:50%;background:var(--pitch);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:22px;background-size:cover;background-position:center;flex-shrink:0;}
+.player-header h2{font-family:var(--font-display);font-size:24px;margin:0;}
+.player-header .meta{font-size:13px;color:var(--ink-soft);}
+
+.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+.period-switch{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:10px;}
+.period-switch button{border:none;background:transparent;padding:8px 12px;border-radius:7px;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+.period-switch button.active{background:var(--gold);color:#fff;}
+.filters .spacer{flex:1;}
+.pdf-btn{background:var(--pitch);color:#fff;border:none;padding:10px 16px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
+
+canvas{max-width:100%;display:block;margin:0 auto 18px auto;}
+.legend{display:flex;gap:18px;justify-content:center;margin-bottom:18px;font-size:12.5px;}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block;}
+
+#reportHost{margin-top:6px;}
+.empty-msg{text-align:center;color:var(--ink-soft);padding:40px 16px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <img src="../icons/icon-192.png" alt="Rugby Club Pasian di Prato">
+    <h1>Confronto</h1>
+  </div>
+  <div class="actions">
+    <button onclick="window.location.href='../squadra/'+window.location.search">&#128101; Squadra</button>
+    <button onclick="window.location.href='../'">&#8962; Home</button>
+  </div>
+</div>
+
+<div class="main" id="main"></div>
+
+<script src="../assets/squadra-store.js"></script>
+<script src="../assets/eval-data.js"></script>
+<script src="../assets/report-builder.js"></script>
+<script>
+(function(){
+"use strict";
+var SS = window.SquadraStore;
+var ED = window.EvalData;
+var qs = new URLSearchParams(window.location.search);
+var playerId = qs.get('player');
+var state = { period: 'settembre' };
+
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+var player = playerId ? SS.getPlayer(playerId) : null;
+var main = document.getElementById('main');
+
+if(!player){
+  main.innerHTML = '<div class="empty-msg">Nessun giocatore selezionato.<br><br>Apri il confronto da un giocatore nella pagina Squadra.</div>';
+} else {
+  var avatar = player.foto ? '<div class="avatar-lg" style="background-image:url(&quot;'+player.foto+'&quot;)"></div>' : '<div class="avatar-lg">'+(SS.getInitials(player.nome)||'?')+'</div>';
+  main.innerHTML =
+    '<div class="player-header">'+avatar+'<div><h2>'+escapeHtml(player.nome)+'</h2><div class="meta">'+escapeHtml(player.ruoloPrevalente||'')+'</div></div></div>'+
+    '<div class="filters"><div class="period-switch" id="periodSwitch"></div><div class="spacer"></div>'+
+    '<button class="pdf-btn" id="pdfBtn">&#128424; Scarica PDF</button></div>'+
+    '<canvas id="radarCanvas" width="400" height="400"></canvas>'+
+    '<div class="legend"><span><i style="background:#004860"></i>Allenatore</span><span><i style="background:#7C6650"></i>Giocatore</span></div>'+
+    '<div id="reportHost"></div>';
+
+  function renderPeriods(){
+    var el = document.getElementById('periodSwitch');
+    el.innerHTML = ED.PERIODS.map(function(p){
+      return '<button data-period="'+p.key+'" class="'+(state.period===p.key?'active':'')+'">'+p.label+'</button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('button'), function(btn){
+      btn.addEventListener('click', function(){ state.period = btn.getAttribute('data-period'); renderAll(); });
+    });
+  }
+
+  function drawComparisonRadar(){
+    var canvas = document.getElementById('radarCanvas');
+    var cssSize = Math.min(360, canvas.parentElement.clientWidth);
+    var dpr = window.devicePixelRatio || 1;
+    canvas.style.width = cssSize+'px'; canvas.style.height = cssSize+'px';
+    canvas.width = cssSize*dpr; canvas.height = cssSize*dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    var size = cssSize, cx=size/2, cy=size/2;
+    var labelPad = 56, radius = size/2 - labelPad;
+    var labels = ED.COMPARISON_MAP.map(function(m){return m.label;});
+    var n = labels.length, maxVal=5;
+    var valAvgs = ED.valGroupAverages(player.id, state.period);
+    var autoAvgs = ED.autoGroupAverages(player.id, state.period);
+    var valuesA = ED.COMPARISON_MAP.map(function(m){ return valAvgs[m.valKey]||0; });
+    var valuesB = ED.COMPARISON_MAP.map(function(m){ return autoAvgs[m.autoKey]||0; });
+    ctx.clearRect(0,0,size,size);
+    var i,ang,x,y,r;
+    ctx.strokeStyle = '#DDD1B8'; ctx.lineWidth = 1;
+    for(r=1;r<=5;r++){
+      var rr = radius*(r/5);
+      ctx.beginPath();
+      for(i=0;i<=n;i++){ ang=(Math.PI*2*i/n)-Math.PI/2; x=cx+rr*Math.cos(ang); y=cy+rr*Math.sin(ang); if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+      ctx.stroke();
+    }
+    for(i=0;i<n;i++){ ang=(Math.PI*2*i/n)-Math.PI/2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+radius*Math.cos(ang), cy+radius*Math.sin(ang)); ctx.stroke(); }
+
+    function plot(values, color, alpha){
+      ctx.beginPath();
+      var vv,rr2,xx,yy;
+      for(i=0;i<n;i++){ ang=(Math.PI*2*i/n)-Math.PI/2; vv=values[i]; rr2=radius*(vv/maxVal); xx=cx+rr2*Math.cos(ang); yy=cy+rr2*Math.sin(ang); if(i===0)ctx.moveTo(xx,yy); else ctx.lineTo(xx,yy); }
+      ctx.closePath();
+      ctx.fillStyle = color+alpha; ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+    }
+    plot(valuesA, '#004860', '33');
+    plot(valuesB, '#7C6650', '33');
+
+    ctx.fillStyle = '#51666D';
+    ctx.font = '12px -apple-system, sans-serif';
+    for(i=0;i<n;i++){
+      ang=(Math.PI*2*i/n)-Math.PI/2;
+      var lx=cx+(radius+16)*Math.cos(ang), ly=cy+(radius+16)*Math.sin(ang);
+      var align='center'; if(Math.cos(ang)>0.3) align='left'; else if(Math.cos(ang)<-0.3) align='right';
+      ctx.textAlign=align; ctx.textBaseline='middle';
+      ctx.fillText(labels[i], lx, ly);
+    }
+  }
+
+  function renderAll(){
+    renderPeriods();
+    drawComparisonRadar();
+    document.getElementById('reportHost').innerHTML = window.RugbyReport.playerSectionHtml(player, state.period, {skipHeader:true});
+  }
+
+  document.getElementById('pdfBtn').addEventListener('click', function(){
+    window.RugbyReport.openPlayerReport(player, state.period);
+  });
+
+  window.addEventListener('resize', function(){ drawComparisonRadar(); });
+
+  var styleEl = document.createElement('style');
+  styleEl.textContent = window.RugbyReport.cardCss;
+  document.head.appendChild(styleEl);
+
+  renderAll();
+}
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('../service-worker.js', {scope:'../'}).catch(function(){});
+}
+
+})();
+</script>
+</body>
+</html>
