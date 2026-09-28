@@ -189,6 +189,23 @@ non sono cambiati. Per ripubblicare i file:
    autovalutazioni. Ogni volta che tocchi di nuovo "Drive" i file vengono
    aggiornati con i dati più recenti — niente duplicati.
 
+### Come recuperare i dati da un backup su Drive
+
+Accanto al pulsante "☁ Drive" nella pagina Squadra c'e' il pulsante
+**"⟲ Ripristina da Drive"**: scarica gli ultimi tre file salvati nella
+cartella di backup e li ricarica nell'app al posto dei dati attuali.
+Va usato solo per recuperare dati persi (es. dopo aver disinstallato
+l'app o cambiato tablet), perche' sovrascrive quello che c'e' ora:
+rosa e autovalutazioni vengono sovrascritte anche sugli altri
+dispositivi collegati tramite la sincronizzazione automatica (Parte 4),
+mentre le valutazioni tecniche vengono ripristinate solo per il tecnico
+configurato su quel dispositivo, senza toccare quelle dei colleghi.
+L'app chiede sempre conferma prima di procedere. In alternativa, se hai
+gia' configurato la sincronizzazione automatica (Parte 4) e i dati sono
+ancora presenti su un altro dispositivo collegato, di solito non serve
+nemmeno ripristinare da Drive: basta aprire l'app su un dispositivo
+connesso a Internet perche' si allinei da sola all'ultima versione.
+
 ### Nota sulla connessione Google
 
 Google richiede di norma di riconfermare l'accesso ogni tanto (in genere
@@ -340,7 +357,9 @@ pagina** con tutto quello che lo riguarda, invece di tre pagine separate.
   nome, anno di nascita, ruoli, foto (con la possibilita' di modificare
   ogni giocatore o aggiungerne di nuovi), e da qui tocchi "Apri scheda"
   su un giocatore per entrare nella sua pagina. E' anche il posto dove si
-  fa il backup manuale su Drive (pulsante **☁ Drive** in alto).
+  fa il backup manuale su Drive (pulsante **☁ Drive** in alto) e dove si
+  ripristinano i dati da un backup precedente in caso di necessita'
+  (pulsante **⟲ Ripristina da Drive**, vedi Parte 3).
 - **Giocatore** → la pagina di ogni singolo giocatore, sempre suddivisa
   per periodo (Settembre/Gennaio/Maggio), con quattro sezioni:
   - **Valutazione** → la scheda tecnica compilata dall'allenatore, ora

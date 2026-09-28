@@ -107,6 +107,7 @@ input,select,textarea{font-family:inherit;}
     <span id="cloudStatusHost"></span>
     <button onclick="window.location.href='../'">&#8962; Home</button>
     <button id="driveBackupBtn">&#9729; Drive</button>
+    <button id="driveRestoreBtn">&#8635; Ripristina da Drive</button>
   </div>
 </div>
 
@@ -398,6 +399,48 @@ document.getElementById('driveBackupBtn').addEventListener('click', function(){
   }
   next(0);
 });
+
+/* ---------------- Ripristino da Drive ---------------- */
+document.getElementById('driveRestoreBtn').addEventListener('click', function(){
+  confirmModal(
+    'Ripristinare i dati dall\'ultimo backup su Drive?',
+    'Sovrascrive rosa e autovalutazioni su QUESTO dispositivo (e su tutti i dispositivi collegati tramite la sincronizzazione automatica, se attiva) con l\'ultimo backup salvato su Google Drive. Le valutazioni tecniche vengono ripristinate solo per il tecnico configurato su questo dispositivo, senza toccare quelle inserite dagli altri tecnici. Operazione consigliata solo per recuperare dati persi.',
+    function(){ doRestoreFromDrive(); }
+  );
+});
+function doRestoreFromDrive(){
+  var btn = document.getElementById('driveRestoreBtn');
+  var original = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⟲ Ripristino...';
+  var files = [
+    { key:'rugbyU14_squadra_v1', name:'backup_squadra.json' },
+    { key:'rugbyU14_valutazioni_v2', name:'backup_valutazione.json' },
+    { key:'rugbyU14_autovalutazione_v1', name:'backup_autovalutazione.json' }
+  ];
+  var restored = [], failed = [];
+  function finish(){
+    btn.disabled = false; btn.innerHTML = original;
+    if(restored.length){
+      showToast('Ripristinati da Drive: '+restored.join(', ')+(failed.length ? ' (non trovati: '+failed.join(', ')+')' : '')+'. Ricarico la pagina...');
+      setTimeout(function(){ window.location.reload(); }, 1600);
+    } else {
+      showToast('Nessun backup trovato su Drive da ripristinare.');
+    }
+  }
+  function next(i){
+    if(i >= files.length){ finish(); return; }
+    var f = files[i];
+    window.RugbyDriveBackup.restore(f.name, function(jsonString){
+      try{
+        localStorage.setItem(f.key, jsonString);
+        if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange(f.key);
+        restored.push(f.name);
+      }catch(e){ failed.push(f.name); }
+      next(i+1);
+    }, function(){ failed.push(f.name); next(i+1); });
+  }
+  next(0);
+}
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('../service-worker.js', {scope:'../'}).catch(function(){});

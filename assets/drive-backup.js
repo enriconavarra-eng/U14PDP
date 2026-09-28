@@ -174,6 +174,26 @@ var RugbyDriveBackup = {
         onSuccess();
       }).catch(function(err){ onError(err); });
     }, onError);
+  },
+
+  /* Scarica "filename" dalla cartella di backup su Drive e restituisce
+     il suo contenuto (stringa JSON) a onSuccess. Se il file non esiste
+     ancora su Drive, chiama onError con un messaggio chiaro. */
+  restore: function(filename, onSuccess, onError){
+    if(!isConfigured()){
+      onError(new Error('Il backup su Drive non e\' ancora configurato in questa app (manca il Client ID).'));
+      return;
+    }
+    getAccessToken(true, function(token){
+      getOrCreateBackupFolder(token).then(function(folderId){
+        return findFile(token, filename, folderId, null);
+      }).then(function(file){
+        if(!file) throw new Error('Nessun backup "'+filename+'" trovato su Google Drive.');
+        return driveFetch('https://www.googleapis.com/drive/v3/files/'+file.id+'?alt=media', {method:'GET'}, token);
+      }).then(function(data){
+        onSuccess(JSON.stringify(data));
+      }).catch(function(err){ onError(err); });
+    }, onError);
   }
 };
 
