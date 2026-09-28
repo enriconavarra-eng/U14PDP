@@ -23,8 +23,22 @@ var ROLES_LIST = ['Pilone','Tallonatore','Seconda linea','Terza linea',
   'Mediano di mischia','Mediano di apertura','Centro','Ala','Estremo'];
 
 var data = null;
+var changeListeners = [];
 
 function uid(prefix){ return (prefix||'p') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
+
+/* Notifica cloud-sync.js (se presente/configurato) che i dati locali
+   sono cambiati per iniziativa dell'utente su QUESTO dispositivo, cosi'
+   possono essere inviati a Firestore. E' un no-op sicuro se il modulo
+   di sincronizzazione non e' caricato o non e' configurato. */
+function notifyLocalChange(){
+  if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange('rugbyU14_squadra_v1');
+}
+/* Sottoscrizione per farsi avvisare quando i dati sono cambiati
+   (incluso un aggiornamento arrivato da un altro dispositivo). Usata
+   dalle pagine per ridisegnare la vista corrente in tempo reale. */
+function onChange(cb){ changeListeners.push(cb); }
+function fireChange(){ changeListeners.forEach(function(cb){ try{ cb(); }catch(e){} }); }
 
 function currentSeasonLabel(){
   var d = new Date();
@@ -153,12 +167,13 @@ function addSeason(label){
   data.seasons.push(s);
   data.activeSeasonId = s.id;
   save();
+  notifyLocalChange();
   return s;
 }
 function renameSeason(id, label){
   load();
   var s = data.seasons.find(function(x){return x.id===id;});
-  if(s){ s.label = label; save(); }
+  if(s){ s.label = label; save(); notifyLocalChange(); }
 }
 function deleteSeason(id){
   load();
@@ -167,6 +182,7 @@ function deleteSeason(id){
   data.players = data.players.filter(function(p){return p.seasonId!==id;});
   if(data.activeSeasonId===id) data.activeSeasonId = data.seasons[0].id;
   save();
+  notifyLocalChange();
   return true;
 }
 
@@ -192,6 +208,7 @@ function savePlayer(player){
   if(idx===-1) data.players.push(player);
   else data.players[idx] = player;
   save();
+  notifyLocalChange();
   return player;
 }
 function newPlayer(seasonId){
@@ -202,6 +219,7 @@ function deletePlayer(id){
   load();
   data.players = data.players.filter(function(p){return p.id!==id;});
   save();
+  notifyLocalChange();
   /* pulizia best-effort dei dati di valutazione collegati */
   [LEGACY_VAL_KEY, LEGACY_AUTO_KEY].forEach(function(key){
     try{
@@ -214,6 +232,7 @@ function deletePlayer(id){
       }
     }catch(e){}
   });
+  if(window.RugbyCloudSync) window.RugbyCloudSync.notifyPlayerDeleted(id);
 }
 
 /* ---------------- Foto ---------------- */
@@ -312,6 +331,47 @@ function syncAppPlayers(localPlayers, seasonId, opts){
   return added; // id dei giocatori in rosa senza ancora una voce locale
 }
 
+/* ---------------- Applicazione di aggiornamenti remoti (cloud-sync.js) ----------------
+   Queste funzioni sono chiamate SOLO da assets/cloud-sync.js quando
+   arriva un aggiornamento da un altro dispositivo: aggiornano i dati
+   locali e avvisano gli ascoltatori (onChange), ma non rimandano a
+   loro volta i dati al cloud (altrimenti si creerebbe un rimbalzo
+   inutile tra i dispositivi). */
+function applyRemotePlayerUpsert(remotePlayer){
+  load();
+  if(!remotePlayer || !remotePlayer.id) return false;
+  var merged = ensurePlayerShape(Object.assign({}, remotePlayer));
+  var idx = data.players.findIndex(function(p){return p.id===merged.id;});
+  var changed;
+  if(idx===-1){ data.players.push(merged); changed = true; }
+  else{
+    changed = JSON.stringify(data.players[idx]) !== JSON.stringify(merged);
+    data.players[idx] = merged;
+  }
+  if(changed){ save(); fireChange(); }
+  return changed;
+}
+function applyRemotePlayerRemoved(id){
+  load();
+  var before = data.players.length;
+  data.players = data.players.filter(function(p){return p.id!==id;});
+  if(data.players.length!==before){ save(); fireChange(); return true; }
+  return false;
+}
+function applyRemoteSeasons(seasons){
+  load();
+  if(!Array.isArray(seasons)) return false;
+  var changed = false;
+  seasons.forEach(function(rs){
+    if(!rs || !rs.id) return;
+    var local = data.seasons.find(function(s){return s.id===rs.id;});
+    if(!local){ data.seasons.push({ id: rs.id, label: rs.label||'' }); changed = true; }
+    else if(local.label !== rs.label){ local.label = rs.label; changed = true; }
+  });
+  if(changed){ save(); fireChange(); }
+  return changed;
+}
+
 window.SquadraStore = {
   ROLES_LIST: ROLES_LIST,
   uid: uid,
@@ -330,7 +390,11 @@ window.SquadraStore = {
   deletePlayer: deletePlayer,
   resizeImageFile: resizeImageFile,
   getInitials: getInitials,
-  syncAppPlayers: syncAppPlayers
+  syncAppPlayers: syncAppPlayers,
+  onChange: onChange,
+  applyRemotePlayerUpsert: applyRemotePlayerUpsert,
+  applyRemotePlayerRemoved: applyRemotePlayerRemoved,
+  applyRemoteSeasons: applyRemoteSeasons
 };
 
 })(window);

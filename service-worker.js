@@ -1,13 +1,15 @@
 /* Service worker: cache locale per uso offline.
    Aumenta CACHE_NAME quando aggiorni i file per forzare il refresh
    sui tablet gia' installati. */
-var CACHE_NAME = 'rugby-u14-pasian-v3';
+var CACHE_NAME = 'rugby-u14-pasian-v4';
 var CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './assets/drive-backup.js',
   './assets/squadra-store.js',
+  './assets/firebase-config.js',
+  './assets/cloud-sync.js',
   './assets/eval-data.js',
   './assets/report-builder.js',
   './valutazione/index.html',
@@ -38,12 +40,16 @@ self.addEventListener('activate', function(event){
   );
 });
 
-/* Non mettiamo mai in cache le chiamate verso Google (auth/Drive):
-   devono sempre andare in rete. Per tutto il resto: cache-first,
-   con aggiornamento della cache in background quando possibile. */
+/* Non mettiamo mai in cache le chiamate verso Google (auth/Drive) ne'
+   verso Firebase (autenticazione/sincronizzazione dati in tempo
+   reale): devono sempre andare in rete. Per tutto il resto:
+   cache-first, con aggiornamento della cache in background quando
+   possibile. */
 self.addEventListener('fetch', function(event){
   var url = event.request.url;
-  if(url.indexOf('googleapis.com') !== -1 || url.indexOf('accounts.google.com') !== -1){
+  if(url.indexOf('googleapis.com') !== -1 || url.indexOf('accounts.google.com') !== -1 ||
+     url.indexOf('gstatic.com') !== -1 || url.indexOf('firebaseio.com') !== -1 ||
+     url.indexOf('firebaseapp.com') !== -1){
     return; // lascia passare alla rete normalmente
   }
   if(event.request.method !== 'GET') return;

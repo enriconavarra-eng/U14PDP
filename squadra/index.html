@@ -104,6 +104,7 @@ input,select,textarea{font-family:inherit;}
     <h1>Squadra</h1>
   </div>
   <div class="actions">
+    <span id="cloudStatusHost"></span>
     <button onclick="window.location.href='../'">&#8962; Home</button>
     <button id="driveBackupBtn">&#9729; Drive</button>
   </div>
@@ -169,6 +170,8 @@ input,select,textarea{font-family:inherit;}
 </div>
 
 <script src="../assets/squadra-store.js"></script>
+<script src="../assets/firebase-config.js"></script>
+<script src="../assets/cloud-sync.js"></script>
 <script src="../assets/drive-backup.js"></script>
 <script>
 (function(){
@@ -401,6 +404,14 @@ renderSeasons();
 renderRoster();
 if(qs.get('new')==='1'){ openPlayerModal(null); }
 else if(qs.get('player') && qs.get('edit')==='1'){ openPlayerModal(qs.get('player')); }
+
+/* Se la rosa cambia da un altro dispositivo, ridisegna stagioni e rosa. */
+if(window.SquadraStore && window.SquadraStore.onChange){
+  window.SquadraStore.onChange(function(){ renderSeasons(); renderRoster(); });
+}
+if(window.RugbyCloudSync){
+  window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
+}
 
 })();
 </script>

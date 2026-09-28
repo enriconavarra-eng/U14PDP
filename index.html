@@ -118,9 +118,11 @@ body{
     Consiglio: se non l'hai gia fatto, installa questa app dalla home del tablet (menu del browser &#8594; "Installa app" o "Aggiungi a schermata Home") per usarla come una vera app, anche offline.
   </div>
 
-  <div class="footer-note">I dati restano sul tablet. Usa "Backup su Drive" nelle singole schede per salvarli anche su Google Drive.</div>
+  <div class="footer-note" id="footerNote">I dati restano sul tablet. Usa "Backup su Drive" nelle singole schede per salvarli anche su Google Drive.</div>
 
 <script src="./assets/squadra-store.js"></script>
+<script src="./assets/firebase-config.js"></script>
+<script src="./assets/cloud-sync.js"></script>
 <script>
 (function(){
   var SS = window.SquadraStore;
@@ -143,6 +145,23 @@ body{
     renderSeasons();
   });
   renderSeasons();
+  if(SS.onChange) SS.onChange(renderSeasons);
+
+  if(window.RugbyCloudSync){
+    window.RugbyCloudSync.onStatusChange(function(status){
+      var note = document.getElementById('footerNote');
+      if(!note) return;
+      if(status.state === 'disabled'){
+        note.textContent = 'I dati restano su questo dispositivo. Usa "Backup su Drive" nelle singole schede per salvarli anche su Google Drive.';
+      } else if(status.state === 'online'){
+        note.textContent = 'Sincronizzazione automatica attiva: i dati si aggiornano su tutti i dispositivi collegati.';
+      } else if(status.state === 'connecting'){
+        note.textContent = 'Connessione alla sincronizzazione automatica in corso...';
+      } else {
+        note.textContent = 'Sincronizzazione automatica non disponibile al momento: i dati restano comunque salvati su questo dispositivo.';
+      }
+    });
+  }
 })();
 
 if('serviceWorker' in navigator){

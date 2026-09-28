@@ -254,6 +254,8 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
     </div>
     <div class="subtitle" id="squadSubtitle"></div>
     <div class="actions">
+      <span id="cloudStatusHost"></span>
+      <button id="tecnicoBtn" title="Cambia tecnico">&#128100; <span id="tecnicoName"></span></button>
       <button id="squadraLinkBtn" title="Rosa squadra">&#128101; Squadra</button>
       <button id="riepilogoLinkBtn" title="Riepilogo squadra">&#128202; Riepilogo</button>
       <button id="confrontoLinkBtn" title="Confronto con l'autovalutazione" class="hidden">&#9878; Confronto</button>
@@ -292,6 +294,8 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
 </div>
 
 <script src="../assets/squadra-store.js"></script>
+<script src="../assets/firebase-config.js"></script>
+<script src="../assets/cloud-sync.js"></script>
 <script src="../assets/eval-data.js"></script>
 <script src="../assets/report-builder.js"></script>
 <script src="../assets/drive-backup.js"></script>
@@ -426,7 +430,32 @@ var state = {
   search: ''
 };
 
+/* ============================================================
+   IDENTITA' TECNICO (per distinguere piu' valutatori)
+============================================================ */
+var TECNICO_NOME_KEY = 'rugbyU14_tecnicoNome';
+var CURRENT_TECNICO = null;
+function normTecnico(s){ return (String(s||'').trim().toLowerCase().replace(/\s+/g,' ')) || 'tecnico'; }
+function loadCurrentTecnico(){
+  var nome = localStorage.getItem(TECNICO_NOME_KEY);
+  if(!nome){
+    nome = (window.prompt('Come ti chiami? Il nome serve per distinguere le valutazioni quando piu\' di un tecnico usa questa scheda.', '') || '').trim() || 'Tecnico';
+    localStorage.setItem(TECNICO_NOME_KEY, nome);
+  }
+  CURRENT_TECNICO = { id: normTecnico(nome), nome: nome };
+  if(window.RugbyCloudSync) window.RugbyCloudSync.setTecnico(CURRENT_TECNICO.id, CURRENT_TECNICO.nome);
+}
+function changeCurrentTecnico(){
+  var nome = (window.prompt('Nome del tecnico che sta usando questa scheda ora:', CURRENT_TECNICO.nome) || '').trim();
+  if(!nome) return;
+  localStorage.setItem(TECNICO_NOME_KEY, nome);
+  CURRENT_TECNICO = { id: normTecnico(nome), nome: nome };
+  if(window.RugbyCloudSync) window.RugbyCloudSync.setTecnico(CURRENT_TECNICO.id, CURRENT_TECNICO.nome);
+  renderAll();
+}
+
 function loadData(){
+  loadCurrentTecnico();
   try{
     var raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
@@ -464,6 +493,7 @@ function visiblePlayers(){
 function saveData(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({players: state.players})); }
   catch(e){ showToast('Impossibile salvare: memoria piena o non disponibile.'); }
+  if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange(STORAGE_KEY);
 }
 function migrateLegacyPlayer(p){
   var np = {
@@ -487,8 +517,17 @@ function ensurePlayerShape(p){
   if(p.foto===undefined) p.foto = '';
   if(!p.valutazioni) p.valutazioni = {};
   PERIODS.forEach(function(per){
-    if(!p.valutazioni[per.key]) p.valutazioni[per.key] = {scores:{}};
-    if(!p.valutazioni[per.key].scores) p.valutazioni[per.key].scores = {};
+    var pd = p.valutazioni[per.key];
+    if(!pd) pd = p.valutazioni[per.key] = {};
+    if(!pd.byTecnico){
+      pd.byTecnico = {};
+      /* migrazione dati pre-esistenti a scorer singolo: attribuiti al
+         tecnico che apre per primo l'app aggiornata su questo dispositivo */
+      if(pd.scores && Object.keys(pd.scores).length && CURRENT_TECNICO){
+        pd.byTecnico[CURRENT_TECNICO.id] = { nome: CURRENT_TECNICO.nome, scores: pd.scores };
+      }
+    }
+    delete pd.scores;
   });
   return p;
 }
@@ -535,9 +574,26 @@ function resizeImageFile(file, maxW, maxH, quality, onDone, onError){
   reader.readAsDataURL(file);
 }
 
-function getScores(player, period){
+function getTecnicoScores(player, period, tecnicoId, tecnicoNome){
   ensurePlayerShape(player);
-  return player.valutazioni[period || state.activePeriod].scores;
+  var pd = player.valutazioni[period || state.activePeriod];
+  if(!pd.byTecnico[tecnicoId]) pd.byTecnico[tecnicoId] = { nome: tecnicoNome || tecnicoId, scores: {} };
+  return pd.byTecnico[tecnicoId].scores;
+}
+/* Punteggi del tecnico attualmente collegato su questo dispositivo:
+   usata da tutta la UI di modifica/visualizzazione esistente, quindi
+   ognuno vede e modifica solo la propria valutazione. */
+function getScores(player, period){
+  return getTecnicoScores(player, period, CURRENT_TECNICO.id, CURRENT_TECNICO.nome);
+}
+/* Elenco di tutti i tecnici che hanno valutato il giocatore nel periodo,
+   usato da Confronto/Riepilogo per mostrare tutte le valutazioni insieme. */
+function getAllTecniciScores(player, period){
+  ensurePlayerShape(player);
+  var pd = player.valutazioni[period || state.activePeriod];
+  return Object.keys(pd.byTecnico).map(function(tid){
+    return { id: tid, nome: pd.byTecnico[tid].nome, scores: pd.byTecnico[tid].scores };
+  });
 }
 function roleDisplay(player){
   if(!player.ruoli || player.ruoli.length===0) return 'Non assegnato';
@@ -762,6 +818,7 @@ function escapeHtml(s){
    RENDER: MAIN
 ============================================================ */
 function renderAll(){
+  document.getElementById('tecnicoName').textContent = CURRENT_TECNICO.nome;
   renderSeasonSelect();
   renderPeriodSwitch();
   renderSidebar();
@@ -926,7 +983,14 @@ function renderTabRiepilogo(player){
     '</div>';
   }).join('');
 
-  return '<button type="button" class="pdf-report-btn" id="pdfReportBtn">&#128424; Scarica PDF riepilogo</button>'+
+  var altriTecnici = getAllTecniciScores(player).filter(function(t){ return t.id!==CURRENT_TECNICO.id; });
+  var tecnicoNoteHtml = '<div class="period-banner" style="background:var(--surface-2);color:var(--ink-soft);">'+
+    'Stai vedendo la valutazione di <strong style="color:var(--ink);">'+escapeHtml(CURRENT_TECNICO.nome)+'</strong>'+
+    (altriTecnici.length ? ' — presenti anche: '+altriTecnici.map(function(t){return escapeHtml(t.nome);}).join(', ')+' (vedi Confronto per tutte insieme)' : '')+
+  '</div>';
+
+  return tecnicoNoteHtml+
+  '<button type="button" class="pdf-report-btn" id="pdfReportBtn">&#128424; Scarica PDF riepilogo</button>'+
   '<div class="summary-grid">'+
     '<div class="card">'+
       '<div class="radar-toggle">'+
@@ -1048,6 +1112,7 @@ document.getElementById('newPlayerBtn').addEventListener('click', function(){
 });
 document.getElementById('searchInput').addEventListener('input', function(e){ state.search=e.target.value; renderSidebar(); });
 
+document.getElementById('tecnicoBtn').addEventListener('click', changeCurrentTecnico);
 document.getElementById('squadraLinkBtn').addEventListener('click', function(){
   window.location.href = '../squadra/?season='+encodeURIComponent(state.activeSeasonId);
 });
@@ -1143,6 +1208,17 @@ function closeSidebarMobile(){ sidebar.classList.remove('open'); }
 ============================================================ */
 loadData();
 renderAll();
+
+/* Se arrivano aggiornamenti da un altro dispositivo (un altro tecnico,
+   o la rosa modificata dalla pagina Squadra), ricarica i dati e
+   ridisegna la vista corrente. */
+if(window.RugbyCloudSync){
+  window.RugbyCloudSync.onDataChange(STORAGE_KEY, function(){ loadData(); renderAll(); });
+  window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
+}
+if(window.SquadraStore && window.SquadraStore.onChange){
+  window.SquadraStore.onChange(function(){ loadData(); renderAll(); });
+}
 
 })();
 </script>

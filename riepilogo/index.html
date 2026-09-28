@@ -67,6 +67,7 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
     <h1>Riepilogo Squadra</h1>
   </div>
   <div class="actions">
+    <span id="cloudStatusHost"></span>
     <button onclick="window.location.href='../squadra/'+window.location.search">&#128101; Squadra</button>
     <button onclick="window.location.href='../'">&#8962; Home</button>
   </div>
@@ -86,6 +87,8 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
 </div>
 
 <script src="../assets/squadra-store.js"></script>
+<script src="../assets/firebase-config.js"></script>
+<script src="../assets/cloud-sync.js"></script>
 <script src="../assets/eval-data.js"></script>
 <script src="../assets/report-builder.js"></script>
 <script>
@@ -138,12 +141,14 @@ function renderTable(){
     return;
   }
   var rows = players.map(function(p){
-    var valTot = ED.valTotalAverage(p.id, state.period);
+    var tecnici = ED.getValTecnici(p.id, state.period);
+    var valTot = ED.valCombinedTotalAverage(p.id, state.period);
     var autoTot = ED.autoTotalAverage(p.id, state.period);
     var avatar = p.foto ? '<div class="avatar" style="background-image:url(&quot;'+p.foto+'&quot;)"></div>' : '<div class="avatar">'+(SS.getInitials(p.nome)||'?')+'</div>';
+    var tecniciBadge = tecnici.length ? '<div style="font-size:10.5px;color:var(--ink-soft);font-weight:400;">'+(tecnici.length===1 ? escapeHtml(tecnici[0].nome) : tecnici.length+' tecnici')+'</div>' : '';
     return '<tr>'+
       '<td><div class="name-cell">'+avatar+'<span>'+escapeHtml(p.nome)+'</span></div></td>'+
-      '<td class="mono" style="color:'+scoreColor(valTot)+'">'+fmt(valTot)+'</td>'+
+      '<td class="mono" style="color:'+scoreColor(valTot)+'">'+fmt(valTot)+tecniciBadge+'</td>'+
       '<td class="mono" style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</td>'+
       '<td><button class="pdf-btn" data-id="'+p.id+'">&#128424; PDF</button></td>'+
     '</tr>';
@@ -171,6 +176,17 @@ if('serviceWorker' in navigator){
 renderSeasons();
 renderPeriods();
 renderTable();
+
+/* Se i dati cambiano da un altro dispositivo (rosa, valutazioni o
+   autovalutazioni), ridisegna la tabella con i valori aggiornati. */
+if(window.SquadraStore && window.SquadraStore.onChange){
+  window.SquadraStore.onChange(function(){ renderSeasons(); renderTable(); });
+}
+if(window.RugbyCloudSync){
+  window.RugbyCloudSync.onDataChange('rugbyU14_valutazioni_v2', renderTable);
+  window.RugbyCloudSync.onDataChange('rugbyU14_autovalutazione_v1', renderTable);
+  window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
+}
 
 })();
 </script>

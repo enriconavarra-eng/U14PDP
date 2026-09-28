@@ -58,18 +58,36 @@ function readRaw(key){
 
 function fmt(v){ return (v===null||v===undefined||isNaN(v)) ? null : Math.round(v*10)/10; }
 
-/* ---- Lettura Scheda Valutazione ---- */
+/* Tavolozza colori per distinguere piu' tecnici nei grafici/tabelle.
+   Il giocatore (autovalutazione) usa sempre il colore oro, a parte. */
+var TECNICO_COLORS = ['#004860', '#B8701F', '#548235', '#7030A0', '#B5533C'];
+function tecnicoColor(index){ return TECNICO_COLORS[index % TECNICO_COLORS.length]; }
+
+/* ---- Lettura Scheda Valutazione (supporta piu' tecnici) ---- */
 function valPlayerRaw(playerId){
   return readRaw(VAL_KEY).find(function(p){return p.id===playerId;}) || null;
 }
-function valGroupAverages(playerId, periodKey){
+/* Elenco dei tecnici che hanno valutato questo giocatore nel periodo,
+   ciascuno con un colore stabile per i grafici. */
+function getValTecnici(playerId, periodKey){
+  var p = valPlayerRaw(playerId);
+  if(!p || !p.valutazioni || !p.valutazioni[periodKey] || !p.valutazioni[periodKey].byTecnico) return [];
+  var bt = p.valutazioni[periodKey].byTecnico;
+  return Object.keys(bt)
+    .filter(function(tid){ return bt[tid] && bt[tid].scores && Object.keys(bt[tid].scores).length>0; })
+    .sort()
+    .map(function(tid, i){ return { id: tid, nome: bt[tid].nome || tid, color: tecnicoColor(i) }; });
+}
+function valGroupAverages(playerId, periodKey, tecnicoId){
   var p = valPlayerRaw(playerId);
   var out = {};
   VAL_GROUPS.forEach(function(g){ out[g.key] = null; });
-  if(!p || !p.valutazioni || !p.valutazioni[periodKey]) return out;
-  var scores = p.valutazioni[periodKey].scores || {};
+  if(!p || !p.valutazioni || !p.valutazioni[periodKey] || !p.valutazioni[periodKey].byTecnico || !tecnicoId) return out;
+  var entry = p.valutazioni[periodKey].byTecnico[tecnicoId];
+  if(!entry) return out;
+  var scores = entry.scores || {};
   /* Media diretta di tutte le skill del gruppo (l'elenco degli id
-     skill per gruppo e' definito piu' sotto, allineato alle due app). */
+     skill per gruppo e' definito piu' sotto, allineato all'app). */
   Object.keys(VAL_SKILL_IDS).forEach(function(gkey){
     var ids = VAL_SKILL_IDS[gkey];
     var sum=0,n=0;
@@ -78,16 +96,32 @@ function valGroupAverages(playerId, periodKey){
   });
   return out;
 }
-function valTotalAverage(playerId, periodKey){
-  var avgs = valGroupAverages(playerId, periodKey);
+function valTotalAverage(playerId, periodKey, tecnicoId){
+  var avgs = valGroupAverages(playerId, periodKey, tecnicoId);
+  var sum=0,n=0;
+  VAL_GROUPS.forEach(function(g){ if(avgs[g.key]!==null){ sum+=avgs[g.key]; n++; } });
+  return n>0 ? fmt(sum/n) : null;
+}
+/* Media tra tutti i tecnici che hanno valutato (utile per una vista
+   d'insieme rapida, es. la tabella Riepilogo Squadra). */
+function valCombinedGroupAverages(playerId, periodKey){
+  var tecnici = getValTecnici(playerId, periodKey);
+  var out = {};
+  VAL_GROUPS.forEach(function(g){
+    var sum=0,n=0;
+    tecnici.forEach(function(t){ var a = valGroupAverages(playerId, periodKey, t.id)[g.key]; if(a!==null){ sum+=a; n++; } });
+    out[g.key] = n>0 ? fmt(sum/n) : null;
+  });
+  return out;
+}
+function valCombinedTotalAverage(playerId, periodKey){
+  var avgs = valCombinedGroupAverages(playerId, periodKey);
   var sum=0,n=0;
   VAL_GROUPS.forEach(function(g){ if(avgs[g.key]!==null){ sum+=avgs[g.key]; n++; } });
   return n>0 ? fmt(sum/n) : null;
 }
 function valHasData(playerId, periodKey){
-  var p = valPlayerRaw(playerId);
-  if(!p || !p.valutazioni || !p.valutazioni[periodKey]) return false;
-  return Object.keys(p.valutazioni[periodKey].scores || {}).length > 0;
+  return getValTecnici(playerId, periodKey).length > 0;
 }
 
 /* elenco id-skill per gruppo (allineato ai file delle due app) */
@@ -148,8 +182,11 @@ window.EvalData = {
   VAL_GROUPS: VAL_GROUPS,
   AUTO_GROUPS: AUTO_GROUPS,
   COMPARISON_MAP: COMPARISON_MAP,
+  getValTecnici: getValTecnici,
   valGroupAverages: valGroupAverages,
   valTotalAverage: valTotalAverage,
+  valCombinedGroupAverages: valCombinedGroupAverages,
+  valCombinedTotalAverage: valCombinedTotalAverage,
   valHasData: valHasData,
   autoGroupAverages: autoGroupAverages,
   autoTotalAverage: autoTotalAverage,

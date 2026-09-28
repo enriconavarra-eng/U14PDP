@@ -64,6 +64,7 @@ canvas{max-width:100%;display:block;margin:0 auto 18px auto;}
     <h1>Confronto</h1>
   </div>
   <div class="actions">
+    <span id="cloudStatusHost"></span>
     <button onclick="window.location.href='../squadra/'+window.location.search">&#128101; Squadra</button>
     <button onclick="window.location.href='../'">&#8962; Home</button>
   </div>
@@ -72,6 +73,8 @@ canvas{max-width:100%;display:block;margin:0 auto 18px auto;}
 <div class="main" id="main"></div>
 
 <script src="../assets/squadra-store.js"></script>
+<script src="../assets/firebase-config.js"></script>
+<script src="../assets/cloud-sync.js"></script>
 <script src="../assets/eval-data.js"></script>
 <script src="../assets/report-builder.js"></script>
 <script>
@@ -90,6 +93,7 @@ var main = document.getElementById('main');
 
 if(!player){
   main.innerHTML = '<div class="empty-msg">Nessun giocatore selezionato.<br><br>Apri il confronto da un giocatore nella pagina Squadra.</div>';
+  if(window.RugbyCloudSync) window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
 } else {
   var avatar = player.foto ? '<div class="avatar-lg" style="background-image:url(&quot;'+player.foto+'&quot;)"></div>' : '<div class="avatar-lg">'+(SS.getInitials(player.nome)||'?')+'</div>';
   main.innerHTML =
@@ -97,7 +101,7 @@ if(!player){
     '<div class="filters"><div class="period-switch" id="periodSwitch"></div><div class="spacer"></div>'+
     '<button class="pdf-btn" id="pdfBtn">&#128424; Scarica PDF</button></div>'+
     '<canvas id="radarCanvas" width="400" height="400"></canvas>'+
-    '<div class="legend"><span><i style="background:#004860"></i>Allenatore</span><span><i style="background:#7C6650"></i>Giocatore</span></div>'+
+    '<div class="legend" id="legendHost"></div>'+
     '<div id="reportHost"></div>';
 
   function renderPeriods(){
@@ -110,7 +114,34 @@ if(!player){
     });
   }
 
-  function drawComparisonRadar(){
+  var PLAYER_COLOR = '#7C6650';
+
+  function getSeries(){
+    var tecnici = ED.getValTecnici(player.id, state.period);
+    var autoAvgs = ED.autoGroupAverages(player.id, state.period);
+    var series = tecnici.map(function(t){
+      var valAvgs = ED.valGroupAverages(player.id, state.period, t.id);
+      return {
+        nome: t.nome,
+        color: t.color,
+        values: ED.COMPARISON_MAP.map(function(m){ return valAvgs[m.valKey]||0; })
+      };
+    });
+    series.push({
+      nome: 'Giocatore',
+      color: PLAYER_COLOR,
+      values: ED.COMPARISON_MAP.map(function(m){ return autoAvgs[m.autoKey]||0; })
+    });
+    return series;
+  }
+
+  function renderLegend(series){
+    document.getElementById('legendHost').innerHTML = series.map(function(s){
+      return '<span><i style="background:'+s.color+'"></i>'+escapeHtml(s.nome)+'</span>';
+    }).join('');
+  }
+
+  function drawComparisonRadar(series){
     var canvas = document.getElementById('radarCanvas');
     var cssSize = Math.min(360, canvas.parentElement.clientWidth);
     var dpr = window.devicePixelRatio || 1;
@@ -122,10 +153,6 @@ if(!player){
     var labelPad = 56, radius = size/2 - labelPad;
     var labels = ED.COMPARISON_MAP.map(function(m){return m.label;});
     var n = labels.length, maxVal=5;
-    var valAvgs = ED.valGroupAverages(player.id, state.period);
-    var autoAvgs = ED.autoGroupAverages(player.id, state.period);
-    var valuesA = ED.COMPARISON_MAP.map(function(m){ return valAvgs[m.valKey]||0; });
-    var valuesB = ED.COMPARISON_MAP.map(function(m){ return autoAvgs[m.autoKey]||0; });
     ctx.clearRect(0,0,size,size);
     var i,ang,x,y,r;
     ctx.strokeStyle = '#DDD1B8'; ctx.lineWidth = 1;
@@ -145,8 +172,7 @@ if(!player){
       ctx.fillStyle = color+alpha; ctx.fill();
       ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
     }
-    plot(valuesA, '#004860', '33');
-    plot(valuesB, '#7C6650', '33');
+    series.forEach(function(s){ plot(s.values, s.color, '33'); });
 
     ctx.fillStyle = '#51666D';
     ctx.font = '12px -apple-system, sans-serif';
@@ -161,7 +187,9 @@ if(!player){
 
   function renderAll(){
     renderPeriods();
-    drawComparisonRadar();
+    var series = getSeries();
+    renderLegend(series);
+    drawComparisonRadar(series);
     document.getElementById('reportHost').innerHTML = window.RugbyReport.playerSectionHtml(player, state.period, {skipHeader:true});
   }
 
@@ -169,13 +197,23 @@ if(!player){
     window.RugbyReport.openPlayerReport(player, state.period);
   });
 
-  window.addEventListener('resize', function(){ drawComparisonRadar(); });
+  window.addEventListener('resize', function(){ drawComparisonRadar(getSeries()); });
 
   var styleEl = document.createElement('style');
   styleEl.textContent = window.RugbyReport.cardCss;
   document.head.appendChild(styleEl);
 
   renderAll();
+
+  /* Se i dati cambiano da un altro dispositivo, ridisegna confronto e PDF. */
+  if(window.SquadraStore && window.SquadraStore.onChange){
+    window.SquadraStore.onChange(renderAll);
+  }
+  if(window.RugbyCloudSync){
+    window.RugbyCloudSync.onDataChange('rugbyU14_valutazioni_v2', renderAll);
+    window.RugbyCloudSync.onDataChange('rugbyU14_autovalutazione_v1', renderAll);
+    window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
+  }
 }
 
 if('serviceWorker' in navigator){

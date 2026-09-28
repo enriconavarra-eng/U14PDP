@@ -47,11 +47,9 @@ function playerSectionHtml(player, periodKey, opts){
   var ED = window.EvalData;
   var periodLbl = (ED.PERIODS.find(function(p){return p.key===periodKey;})||{}).label || periodKey;
 
-  var valHas = ED.valHasData(player.id, periodKey);
+  var tecnici = ED.getValTecnici(player.id, periodKey); /* [{id,nome,color}, ...] */
   var autoHas = ED.autoHasData(player.id, periodKey);
-  var valAvgs = ED.valGroupAverages(player.id, periodKey);
   var autoAvgs = ED.autoGroupAverages(player.id, periodKey);
-  var valTot = ED.valTotalAverage(player.id, periodKey);
   var autoTot = ED.autoTotalAverage(player.id, periodKey);
 
   var html = opts.skipHeader ? '' : playerHeaderHtml(player);
@@ -59,14 +57,19 @@ function playerSectionHtml(player, periodKey, opts){
 
   html += '<div class="rb-grid2">';
 
-  html += '<div class="rb-card"><h3>Valutazione tecnica <span class="rb-tag">allenatore</span></h3>';
-  if(!valHas){
-    html += '<p class="rb-empty">Nessun dato per questo periodo.</p>';
+  if(tecnici.length===0){
+    html += '<div class="rb-card"><h3>Valutazione tecnica <span class="rb-tag">allenatore</span></h3>'+
+      '<p class="rb-empty">Nessun tecnico ha ancora valutato questo giocatore in questo periodo.</p></div>';
   } else {
-    ED.VAL_GROUPS.forEach(function(g){ html += barRow(g.label, valAvgs[g.key], g.color); });
-    html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(valTot)+'">'+fmt(valTot)+'</strong></div>';
+    tecnici.forEach(function(t){
+      var avgs = ED.valGroupAverages(player.id, periodKey, t.id);
+      var tot = ED.valTotalAverage(player.id, periodKey, t.id);
+      html += '<div class="rb-card"><h3>'+esc(t.nome)+' <span class="rb-tag">tecnico</span></h3>';
+      ED.VAL_GROUPS.forEach(function(g){ html += barRow(g.label, avgs[g.key], t.color); });
+      html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(tot)+'">'+fmt(tot)+'</strong></div>';
+      html += '</div>';
+    });
   }
-  html += '</div>';
 
   html += '<div class="rb-card"><h3>Autovalutazione <span class="rb-tag">giocatore</span></h3>';
   if(!autoHas){
@@ -86,33 +89,36 @@ function playerSectionHtml(player, periodKey, opts){
 
   html += '</div>'; /* /rb-grid2 */
 
-  if(valHas || autoHas){
-    html += '<div class="rb-card"><h3>Confronto allenatore / giocatore</h3>';
-    html += '<table class="rb-table"><thead><tr><th>Area</th><th>Allenatore</th><th>Giocatore</th><th>Differenza</th></tr></thead><tbody>';
-    var totalDiffSum=0, totalDiffN=0;
+  if(tecnici.length>0 || autoHas){
+    html += '<div class="rb-card"><h3>Confronto tra tutte le valutazioni</h3>';
+    html += '<table class="rb-table"><thead><tr><th>Area</th>';
+    tecnici.forEach(function(t){ html += '<th style="color:'+t.color+'">'+esc(t.nome)+'</th>'; });
+    html += '<th style="color:#7C6650">Giocatore</th></tr></thead><tbody>';
     ED.COMPARISON_MAP.forEach(function(m){
-      var vv = valAvgs[m.valKey], av = autoAvgs[m.autoKey];
-      var diffTxt = '-', diffColor = '#666';
-      if(vv!==null && av!==null){
-        var diff = av - vv;
-        totalDiffSum += diff; totalDiffN++;
-        diffTxt = (diff>0?'+':'')+diff.toFixed(1);
-        diffColor = Math.abs(diff)<0.6 ? '#2E8F72' : (Math.abs(diff)<1.3 ? '#B8701F' : '#B5533C');
-      }
-      html += '<tr><td>'+esc(m.label)+'</td>'+
-        '<td class="rb-mono">'+fmt(vv)+'</td>'+
-        '<td class="rb-mono">'+fmt(av)+'</td>'+
-        '<td class="rb-mono" style="color:'+diffColor+'">'+diffTxt+'</td></tr>';
+      var av = autoAvgs[m.autoKey];
+      html += '<tr><td>'+esc(m.label)+'</td>';
+      tecnici.forEach(function(t){
+        var vv = ED.valGroupAverages(player.id, periodKey, t.id)[m.valKey];
+        html += '<td class="rb-mono">'+fmt(vv)+'</td>';
+      });
+      html += '<td class="rb-mono">'+fmt(av)+'</td></tr>';
     });
     html += '</tbody></table>';
-    if(totalDiffN>0){
-      var avgDiff = totalDiffSum/totalDiffN;
-      var note = Math.abs(avgDiff)<0.4
-        ? 'Il giocatore ha una percezione di se\' molto allineata alla valutazione dell\'allenatore.'
-        : (avgDiff>0
-          ? 'In media il giocatore si valuta piu\' in alto rispetto a come lo vede l\'allenatore.'
-          : 'In media il giocatore si valuta piu\' in basso rispetto a come lo vede l\'allenatore.');
-      html += '<p class="rb-note">'+note+'</p>';
+    if(tecnici.length>1){
+      html += '<p class="rb-note">Quando piu\' di un tecnico ha valutato lo stesso giocatore, un forte scostamento tra le loro colonne puo\' segnalare un criterio di valutazione da allineare.</p>';
+    }
+    if(tecnici.length>0 && autoHas){
+      var avgTecTot = 0, nTec=0;
+      tecnici.forEach(function(t){ var tt=ED.valTotalAverage(player.id, periodKey, t.id); if(tt!==null){avgTecTot+=tt; nTec++;} });
+      if(nTec>0 && autoTot!==null){
+        var diff = autoTot - (avgTecTot/nTec);
+        var note = Math.abs(diff)<0.4
+          ? 'Il giocatore ha una percezione di se\' molto allineata alla media dei tecnici.'
+          : (diff>0
+            ? 'In media il giocatore si valuta piu\' in alto rispetto ai tecnici.'
+            : 'In media il giocatore si valuta piu\' in basso rispetto ai tecnici.');
+        html += '<p class="rb-note">'+note+'</p>';
+      }
     }
     html += '</div>';
   }

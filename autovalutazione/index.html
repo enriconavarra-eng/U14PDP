@@ -220,6 +220,7 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
     </div>
     <div class="subtitle" id="squadSubtitle"></div>
     <div class="actions">
+      <span id="cloudStatusHost"></span>
       <button id="squadraLinkBtn" title="Rosa squadra">&#128101; Squadra</button>
       <button id="riepilogoLinkBtn" title="Riepilogo squadra">&#128202; Riepilogo</button>
       <button id="confrontoLinkBtn" title="Confronto con la valutazione tecnica" class="hidden">&#9878; Confronto</button>
@@ -258,6 +259,8 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
 </div>
 
 <script src="../assets/squadra-store.js"></script>
+<script src="../assets/firebase-config.js"></script>
+<script src="../assets/cloud-sync.js"></script>
 <script src="../assets/eval-data.js"></script>
 <script src="../assets/report-builder.js"></script>
 <script src="../assets/drive-backup.js"></script>
@@ -394,6 +397,7 @@ function visiblePlayers(){
 function saveData(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({players: state.players})); }
   catch(e){ showToast('Impossibile salvare: memoria piena o non disponibile.'); }
+  if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange(STORAGE_KEY);
 }
 function ensurePlayerShape(p){
   if(p.annoNascita===undefined) p.annoNascita = '';
@@ -960,6 +964,16 @@ function closeSidebarMobile(){ sidebar.classList.remove('open'); }
 ============================================================ */
 loadData();
 renderAll();
+
+/* Se arrivano aggiornamenti da un altro dispositivo (es. la rosa
+   modificata dalla pagina Squadra), ricarica i dati e ridisegna. */
+if(window.RugbyCloudSync){
+  window.RugbyCloudSync.onDataChange(STORAGE_KEY, function(){ loadData(); renderAll(); });
+  window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
+}
+if(window.SquadraStore && window.SquadraStore.onChange){
+  window.SquadraStore.onChange(function(){ loadData(); renderAll(); });
+}
 
 })();
 </script>
