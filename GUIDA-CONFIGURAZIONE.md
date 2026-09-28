@@ -1,15 +1,21 @@
 # Rugby U14 - Pasian di Prato — Guida alla pubblicazione e al backup su Drive
 
-Questa cartella contiene un'app web installabile (PWA) con: una pagina
-Home con l'annata sportiva, una pagina **Squadra** (rosa condivisa dei
-giocatori), la **Scheda Valutazione** (allenatore — ora con supporto
-per **piu' tecnici** che valutano lo stesso giocatore), l'**Autovalutazione**
-(giocatore), una pagina **Confronto** che mette insieme tutte le
-valutazioni di un giocatore (ogni tecnico piu' il giocatore stesso) e
-una pagina **Riepilogo Squadra** da cui scaricare il PDF riassuntivo di
-ciascun giocatore o di tutta la squadra. C'e' anche il backup manuale
-su una cartella dedicata di Google Drive, e (opzionale, vedi Parte 4)
-la **sincronizzazione automatica multi-dispositivo** tramite Firebase.
+Questa cartella contiene un'app web installabile (PWA), semplificata in
+un'unica pagina per ogni giocatore: una pagina Home con l'annata
+sportiva, una pagina **Squadra** (rosa condivisa dei giocatori, dove si
+aggiungono/modificano i giocatori) e, per ogni giocatore, una pagina
+**Giocatore** che raccoglie in un solo posto la sua **Valutazione**
+(allenatore — con supporto per **piu' tecnici** che valutano lo stesso
+giocatore), la sua **Autovalutazione**, i suoi **Obiettivi** e la
+**Panoramica** di confronto tra tutte le valutazioni (ogni tecnico piu'
+l'autovalutazione del giocatore), sempre suddivise per periodo
+(Settembre/Gennaio/Maggio). C'e' anche una pagina **Riepilogo Squadra**
+da cui scaricare il PDF riassuntivo di ciascun giocatore o di tutta la
+squadra. Il backup manuale su una cartella dedicata di Google Drive
+resta disponibile (dalla pagina Squadra) come rete di sicurezza in piu',
+e (opzionale, vedi Parte 4) c'e' la **sincronizzazione automatica
+multi-dispositivo** tramite Firebase, che tiene i dati sempre allineati
+e aggiornati alla versione piu' recente su tutti i dispositivi collegati.
 
 Per funzionare come app installabile e per il backup su Drive, l'app deve
 essere pubblicata su un indirizzo web vero (non basta piu' aprire il file
@@ -23,28 +29,32 @@ pubblicata"** subito dopo questo paragrafo.
 ## Aggiornare un'app gia' pubblicata (solo se hai gia' fatto Parte 1 e 2)
 
 Questo pacchetto e' un aggiornamento: contiene tutti i file della tua app
-(compresi quelli nuovi per Squadra, Confronto, Riepilogo e la
-sincronizzazione automatica) con il tuo Client ID di Google gia'
-inserito in `assets/drive-backup.js`, quindi **non devi rifare la
-configurazione di Google Cloud per il backup su Drive**. Se vuoi anche
-attivare la sincronizzazione automatica multi-dispositivo, leggi la
-**Parte 4** piu' sotto (e' facoltativa: senza, l'app funziona come
-prima, salvando solo sul dispositivo in uso). Per ripubblicare i file:
+(compresa la nuova pagina unica **Giocatore**, che sostituisce le
+vecchie pagine separate Valutazione/Autovalutazione/Confronto) con il
+tuo Client ID di Google gia' inserito in `assets/drive-backup.js`,
+quindi **non devi rifare la configurazione di Google Cloud per il
+backup su Drive**. Se avevi gia' attivato la sincronizzazione
+automatica multi-dispositivo (Parte 4), continua a funzionare senza
+bisogno di rifare la configurazione: i dati e la struttura su Firebase
+non sono cambiati. Per ripubblicare i file:
 
 1. Apri il tuo repository su GitHub (quello che avevi creato, es.
    `enriconavarra-eng/U14PDP`).
-2. Apri la cartella `pwa` che hai ricevuto ora, seleziona **tutto** il suo
+2. **Elimina le cartelle vecchie** `valutazione`, `autovalutazione` e
+   `confronto` dal repository (aprile una alla volta, poi l'icona del
+   cestino o "Delete directory" in alto a destra nella vista file) — sono
+   state sostituite dalla nuova cartella `giocatore` e non servono piu'.
+3. Apri la cartella `pwa` che hai ricevuto ora, seleziona **tutto** il suo
    contenuto (tutti i file e le cartelle: `index.html`, `manifest.json`,
-   `service-worker.js`, `assets`, `icons`, `valutazione`,
-   `autovalutazione`, `squadra`, `riepilogo`, `confronto`) e trascinali
-   nella pagina del repository su GitHub ("Add file" > "Upload files").
-   GitHub ti chiedera' se vuoi sostituire i file gia' esistenti con lo
-   stesso nome: conferma. Le cartelle nuove (`squadra`, `riepilogo`,
-   `confronto`) verranno semplicemente aggiunte.
-3. Scrivi un messaggio tipo "Aggiornamento: Squadra, Confronto, PDF" e
-   clicca **Commit changes**. Dopo 1-2 minuti GitHub Pages pubblica la
-   nuova versione.
-4. **Importante — sul tablet**: chiudi del tutto l'app installata (non
+   `service-worker.js`, `assets`, `icons`, `giocatore`, `squadra`,
+   `riepilogo`) e trascinali nella pagina del repository su GitHub ("Add
+   file" > "Upload files"). GitHub ti chiedera' se vuoi sostituire i file
+   gia' esistenti con lo stesso nome: conferma. La cartella nuova
+   (`giocatore`) verra' semplicemente aggiunta.
+4. Scrivi un messaggio tipo "Aggiornamento: pagina Giocatore unica,
+   valutazione a pulsanti" e clicca **Commit changes**. Dopo 1-2 minuti
+   GitHub Pages pubblica la nuova versione.
+5. **Importante — sul tablet**: chiudi del tutto l'app installata (non
    basta metterla in secondo piano: rimuovila dalle app recenti/multitasking
    di Android) e riaprila. Il file `service-worker.js` in questo pacchetto
    ha gia' un numero di versione piu' alto (serve proprio a far scaricare
@@ -52,7 +62,7 @@ prima, salvando solo sul dispositivo in uso). Per ripubblicare i file:
    al riavvio l'app si aggiornera' da sola. Se non vedi le novita', prova
    a riaprire l'app una seconda volta (la prima riapertura scarica
    l'aggiornamento, la seconda lo mostra).
-5. I dati che avevi gia' inserito (giocatori, valutazioni, autovalutazioni)
+6. I dati che avevi gia' inserito (giocatori, valutazioni, autovalutazioni)
    restano sul tablet: al primo avvio dopo l'aggiornamento l'app li
    importa automaticamente nella nuova pagina Squadra, in una stagione
    creata di default con l'annata sportiva corrente. Da li' potrai
@@ -72,8 +82,9 @@ prima, salvando solo sul dispositivo in uso). Per ripubblicare i file:
    existing file** (o "Add file" > "Upload files").
 4. Trascina dentro TUTTI i file e le cartelle presenti in questo pacchetto
    (`index.html`, `manifest.json`, `service-worker.js`, la cartella
-   `assets`, la cartella `icons`, la cartella `valutazione`, la cartella
-   `autovalutazione`) mantenendo la stessa struttura di cartelle.
+   `assets`, la cartella `icons`, la cartella `giocatore`, la cartella
+   `squadra`, la cartella `riepilogo`) mantenendo la stessa struttura di
+   cartelle.
    GitHub supporta il trascinamento di intere cartelle da Chrome/Edge su
    computer; se usi Safari trascina i file singolarmente ricreando le
    sottocartelle con "Add file > Create new file" e scrivendo il percorso
@@ -167,15 +178,16 @@ prima, salvando solo sul dispositivo in uso). Per ripubblicare i file:
    "Aggiungi a schermata Home"). Comparira' un'icona con lo stemma del
    club nella home del tablet: da quel momento si apre come un'app vera,
    a schermo intero, anche offline.
-3. Dentro una scheda (Valutazione o Autovalutazione), tocca il pulsante
-   **☁ Drive** in alto. La prima volta comparira' la richiesta di accesso
-   Google: accedi con l'account che hai autorizzato come "test user" al
-   passo 2.3 e concedi il permesso.
+3. Nella pagina **Squadra**, tocca il pulsante **☁ Drive** in alto. La
+   prima volta comparira' la richiesta di accesso Google: accedi con
+   l'account che hai autorizzato come "test user" al passo 2.3 e concedi
+   il permesso.
 4. L'app creera' automaticamente su Google Drive una cartella chiamata
-   **"Backup Rugby U14 - Pasian di Prato"** e salvera' dentro un file
-   `backup_valutazione.json` (o `backup_autovalutazione.json`). Ogni volta
-   che tocchi di nuovo "Drive" il file viene aggiornato con i dati più
-   recenti — niente duplicati.
+   **"Backup Rugby U14 - Pasian di Prato"** e salvera' dentro tre file
+   (`backup_squadra.json`, `backup_valutazione.json` e
+   `backup_autovalutazione.json`) con tutti i dati di rosa, valutazioni e
+   autovalutazioni. Ogni volta che tocchi di nuovo "Drive" i file vengono
+   aggiornati con i dati più recenti — niente duplicati.
 
 ### Nota sulla connessione Google
 
@@ -302,7 +314,7 @@ dispositivo in uso.
 - Anche sullo **stesso** giocatore, due tecnici diversi possono
   valutare in contemporanea senza sovrascriversi: ognuno "possiede" la
   propria fetta di dati (identificata dal nome inserito la prima volta
-  che si apre la Scheda Valutazione su quel dispositivo — tocca
+  che si apre la pagina di un Giocatore su quel dispositivo — tocca
   l'icona &#128100; in alto per cambiarlo).
 - L'autovalutazione del giocatore e i dati anagrafici della rosa
   seguono invece la logica "ultima modifica vince": va benissimo per
@@ -317,28 +329,44 @@ dispositivo in uso.
 
 ---
 
-## Come funziona la nuova struttura (Squadra, Confronto, PDF)
+## Come funziona la nuova struttura (Squadra, Giocatore, PDF)
+
+La struttura e' stata semplificata: ogni giocatore ha adesso **un'unica
+pagina** con tutto quello che lo riguarda, invece di tre pagine separate.
 
 - **Home** → scegli o crea l'**annata sportiva** (es. 2026/2027), poi
   tocca "Vai alla Rosa".
 - **Squadra** → qui gestisci l'elenco dei giocatori di quella stagione:
-  nome, anno di nascita, ruoli, foto. E' l'unico posto dove si modificano
-  questi dati: sono condivisi automaticamente sia dalla Scheda Valutazione
-  sia dall'Autovalutazione. Da ogni giocatore puoi aprire direttamente la
-  sua Valutazione, la sua Autovalutazione o il Confronto tra le due.
-- **Scheda Valutazione** → se piu' di un tecnico usa l'app, ognuno tocca
-  l'icona &#128100; in alto e inserisce il proprio nome: da quel momento
-  le valutazioni di ciascun tecnico restano distinte e nessuno sovrascrive
-  i dati di un collega, anche sullo stesso giocatore.
-- **Confronto** → per un giocatore, mette a confronto TUTTE le
-  valutazioni disponibili sulle stesse quattro aree (Tecnica, Lettura
-  del gioco, Fisico, Testa e Squadra): una linea colorata per ciascun
-  tecnico che lo ha valutato, piu' la sua autovalutazione, con un
-  grafico radar e una tabella comparativa.
-- **Riepilogo Squadra** → tabella con le medie di tutti i giocatori della
-  stagione scelta (media tra i tecnici quando sono piu' di uno), con un
-  pulsante PDF per ciascuno e un pulsante per scaricare un unico PDF con
-  tutta la squadra (un giocatore per pagina).
+  nome, anno di nascita, ruoli, foto (con la possibilita' di modificare
+  ogni giocatore o aggiungerne di nuovi), e da qui tocchi "Apri scheda"
+  su un giocatore per entrare nella sua pagina. E' anche il posto dove si
+  fa il backup manuale su Drive (pulsante **☁ Drive** in alto).
+- **Giocatore** → la pagina di ogni singolo giocatore, sempre suddivisa
+  per periodo (Settembre/Gennaio/Maggio), con quattro sezioni:
+  - **Valutazione** → la scheda tecnica compilata dall'allenatore, ora
+    con semplici pulsanti (come nell'Autovalutazione) al posto delle
+    barre a scorrimento. Se piu' di un tecnico usa l'app, ognuno tocca
+    l'icona &#128100; in alto e inserisce il proprio nome: le valutazioni
+    di ciascun tecnico restano distinte e comparabili tra loro, e nessuno
+    sovrascrive i dati di un collega sullo stesso giocatore.
+  - **Autovalutazione** → come si vede il giocatore, sempre a pulsanti.
+  - **Obiettivi** → gli obiettivi personali, tecnici e di ruolo del
+    giocatore.
+  - **Panoramica** → mette a confronto TUTTE le valutazioni disponibili
+    sulle stesse quattro aree (Tecnica, Lettura del gioco, Fisico, Testa
+    e Squadra): una linea colorata per ciascun tecnico che lo ha
+    valutato, piu' la sua autovalutazione, con un grafico radar, una
+    tabella comparativa e il pulsante per scaricare il PDF del giocatore.
+- **Riepilogo Squadra** → resta una pagina a se' stante, con la tabella
+  delle medie di tutti i giocatori della stagione scelta (media tra i
+  tecnici quando sono piu' di uno), un pulsante PDF per ciascuno e un
+  pulsante per scaricare un unico PDF con tutta la squadra (un giocatore
+  per pagina).
+
+Nota: per ulteriore semplicita', i vecchi pulsanti di esportazione/
+importazione di un file JSON locale (usati raramente) sono stati tolti:
+restano il backup su Google Drive e la sincronizzazione automatica
+(Parte 4) come modi per salvare e recuperare i dati.
 
 ### Il pulsante "Scarica PDF"
 

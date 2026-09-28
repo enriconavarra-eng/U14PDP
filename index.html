@@ -97,28 +97,11 @@ body{
     <a href="./riepilogo/">&#128202; Riepilogo Squadra</a>
   </div>
 
-  <div class="cards" style="margin-top:16px;">
-    <a class="card-link" href="./valutazione/">
-      <div class="card-icon">&#128203;</div>
-      <div class="card-text">
-        <h2>Scheda Valutazione</h2>
-        <p>Per l'allenatore: valutazione tecnica e riepilogo per giocatore.</p>
-      </div>
-    </a>
-    <a class="card-link" href="./autovalutazione/">
-      <div class="card-icon">&#128100;</div>
-      <div class="card-text">
-        <h2>Autovalutazione</h2>
-        <p>Per il giocatore: come mi vedo, i miei obiettivi e riepilogo.</p>
-      </div>
-    </a>
-  </div>
-
   <div class="install-hint" id="installHint">
     Consiglio: se non l'hai gia fatto, installa questa app dalla home del tablet (menu del browser &#8594; "Installa app" o "Aggiungi a schermata Home") per usarla come una vera app, anche offline.
   </div>
 
-  <div class="footer-note" id="footerNote">I dati restano sul tablet. Usa "Backup su Drive" nelle singole schede per salvarli anche su Google Drive.</div>
+  <div class="footer-note" id="footerNote">I dati restano sul tablet. Usa "Backup su Drive" nella Rosa per salvarli anche su Google Drive.</div>
 
 <script src="./assets/squadra-store.js"></script>
 <script src="./assets/firebase-config.js"></script>
@@ -152,7 +135,7 @@ body{
       var note = document.getElementById('footerNote');
       if(!note) return;
       if(status.state === 'disabled'){
-        note.textContent = 'I dati restano su questo dispositivo. Usa "Backup su Drive" nelle singole schede per salvarli anche su Google Drive.';
+        note.textContent = 'I dati restano su questo dispositivo. Usa "Backup su Drive" nella Rosa per salvarli anche su Google Drive.';
       } else if(status.state === 'online'){
         note.textContent = 'Sincronizzazione automatica attiva: i dati si aggiornano su tutti i dispositivi collegati.';
       } else if(status.state === 'connecting'){

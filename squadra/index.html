@@ -276,9 +276,7 @@ function playerCardHtml(p){
   return '<div class="player-card">'+
     '<div class="head">'+avatar+'<div><h3>'+escapeHtml(p.nome)+'</h3><div class="sub">'+sub+'</div></div></div>'+
     '<div class="links">'+
-      '<a href="../valutazione/'+qp+'">&#128203; Valutazione</a>'+
-      '<a href="../autovalutazione/'+qp+'">&#128100; Autovalutazione</a>'+
-      '<a href="../confronto/'+qp+'">&#9878; Confronto</a>'+
+      '<a href="../giocatore/'+qp+'" class="open-player">&#127939; Apri scheda</a>'+
     '</div>'+
     '<div class="row2">'+
       '<button data-edit="'+p.id+'">&#9998; Modifica</button>'+
@@ -381,18 +379,24 @@ document.getElementById('playerModalSave').addEventListener('click', function(){
   showToast('Giocatore salvato.');
 });
 
-/* ---------------- Drive backup (rosa) ---------------- */
+/* ---------------- Drive backup (rosa + valutazioni + autovalutazioni) ---------------- */
 document.getElementById('driveBackupBtn').addEventListener('click', function(){
   var btn = this; var original = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = '☁ Backup...';
-  var raw = localStorage.getItem('rugbyU14_squadra_v1') || '{}';
-  window.RugbyDriveBackup.backup(raw, 'backup_squadra.json', function(){
-    btn.disabled = false; btn.innerHTML = original;
-    showToast('Rosa salvata su Google Drive.');
-  }, function(err){
-    btn.disabled = false; btn.innerHTML = original;
-    showToast((err && err.message) ? err.message : 'Backup su Drive non riuscito.');
-  });
+  var files = [
+    { key:'rugbyU14_squadra_v1', name:'backup_squadra.json' },
+    { key:'rugbyU14_valutazioni_v2', name:'backup_valutazione.json' },
+    { key:'rugbyU14_autovalutazione_v1', name:'backup_autovalutazione.json' }
+  ];
+  function done(){ btn.disabled = false; btn.innerHTML = original; showToast('Rosa, valutazioni e autovalutazioni salvate su Google Drive.'); }
+  function fail(err){ btn.disabled = false; btn.innerHTML = original; showToast((err && err.message) ? err.message : 'Backup su Drive non riuscito.'); }
+  function next(i){
+    if(i >= files.length){ done(); return; }
+    var f = files[i];
+    var raw = localStorage.getItem(f.key) || '{}';
+    window.RugbyDriveBackup.backup(raw, f.name, function(){ next(i+1); }, fail);
+  }
+  next(0);
 });
 
 if('serviceWorker' in navigator){

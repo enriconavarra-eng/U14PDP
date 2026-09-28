@@ -1,7 +1,7 @@
 /* Service worker: cache locale per uso offline.
    Aumenta CACHE_NAME quando aggiorni i file per forzare il refresh
    sui tablet gia' installati. */
-var CACHE_NAME = 'rugby-u14-pasian-v4';
+var CACHE_NAME = 'rugby-u14-pasian-v5';
 var CORE_ASSETS = [
   './',
   './index.html',
@@ -12,11 +12,9 @@ var CORE_ASSETS = [
   './assets/cloud-sync.js',
   './assets/eval-data.js',
   './assets/report-builder.js',
-  './valutazione/index.html',
-  './autovalutazione/index.html',
+  './giocatore/index.html',
   './squadra/index.html',
   './riepilogo/index.html',
-  './confronto/index.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-192.png',
