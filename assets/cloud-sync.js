@@ -50,8 +50,15 @@ var dataListeners = {};
 var timers = {};
 var pendingDirty = {};
 
+/* Aumentare quando si corregge un bug nella logica di "cosa ho gia'
+   sincronizzato": azzera la cache su ogni dispositivo al primo avvio
+   con la nuova versione, cosi' tutto viene ricontrollato da capo con la
+   logica corretta (innocuo: la cache serve solo a evitare invii/letture
+   ripetuti, non contiene dati reali; niente viene cancellato in locale
+   o nel cloud, solo re-inviato/re-scaricato una volta). */
+var CACHE_SCHEMA_VERSION = 2;
 function defaultCache(){
-  return { squadraMeta: null, squadraPlayers: {}, valSlices: {}, valReceived: {}, autoPlayers: {} };
+  return { schemaVersion: CACHE_SCHEMA_VERSION, squadraMeta: null, squadraPlayers: {}, valSlices: {}, valReceived: {}, autoPlayers: {} };
 }
 function loadCache(){
   var c = defaultCache();
@@ -59,7 +66,11 @@ function loadCache(){
     var raw = localStorage.getItem(CACHE_KEY);
     if(raw){
       var parsed = JSON.parse(raw);
-      Object.keys(c).forEach(function(k){ if(parsed[k]) c[k] = parsed[k]; });
+      if(parsed.schemaVersion === CACHE_SCHEMA_VERSION){
+        Object.keys(c).forEach(function(k){ if(parsed[k]) c[k] = parsed[k]; });
+      }
+      /* se la versione non corrisponde (o manca, cioe' cache vecchia),
+         si riparte volutamente da una cache vuota */
     }
   }catch(e){}
   return c;
@@ -288,9 +299,17 @@ function attachListeners(){
       var remote = change.doc.data() || {};
       var json = JSON.stringify(remote.valutazioni || {});
       if(cache.valReceived[id] === json) return;
-      cache.valReceived[id] = json;
       var localPlayer = parsed.players.find(function(p){ return p.id === id; });
-      if(!localPlayer) return; // il giocatore arrivera' con la sincronizzazione Squadra
+      /* Se il giocatore non esiste ancora in locale (es. aggiunto da poco
+         su un altro dispositivo, la sincronizzazione Squadra non ha ancora
+         creato la sua scheda qui), NON segniamo questi dati come "gia'
+         ricevuti": altrimenti resterebbero bloccati per sempre, perche' la
+         prossima volta lo stesso contenuto verrebbe scartato subito dal
+         controllo sopra, anche quando il giocatore nel frattempo esiste
+         gia'. Riproveremo alla prossima connessione (es. riapertura pagina),
+         quando la scheda Squadra sara' stata creata. */
+      if(!localPlayer) return;
+      cache.valReceived[id] = json;
       if(!localPlayer.valutazioni) localPlayer.valutazioni = {};
       var remoteVal = remote.valutazioni || {};
       Object.keys(remoteVal).forEach(function(period){
@@ -317,9 +336,12 @@ function attachListeners(){
       var remote = change.doc.data() || {};
       var json = JSON.stringify(remote.valutazioni || {});
       if(cache.autoPlayers[id] === json) return;
-      cache.autoPlayers[id] = json;
       var localPlayer = parsed.players.find(function(p){ return p.id === id; });
+      /* Stesso motivo del listener sync_val_players qui sopra: non segnare
+         come "gia' ricevuto" se il giocatore non esiste ancora in locale,
+         altrimenti questi dati resterebbero bloccati per sempre. */
       if(!localPlayer) return;
+      cache.autoPlayers[id] = json;
       if(!localPlayer.valutazioni) localPlayer.valutazioni = {};
       var remoteVal = remote.valutazioni || {};
       Object.keys(remoteVal).forEach(function(period){ localPlayer.valutazioni[period] = remoteVal[period]; });
