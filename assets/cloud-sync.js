@@ -170,7 +170,7 @@ function forceFullPushThen(cb){
      inviato in passato. */
   pushSquadra(true);
   pushAuto(true);
-  if(ctx.tecnicoId) pushVal(true);
+  pushVal(true);
   setTimeout(cb, SAFE_MODE_PUSH_WAIT_MS);
 }
 function maybeBootstrapPush(){
@@ -183,7 +183,7 @@ function maybeBootstrapPush(){
   notifyLocalChange(KEY_AUTO);
 }
 function maybeBootstrapValPush(){
-  if(!sdkReady || !ctx.tecnicoId) return;
+  if(!sdkReady) return;
   try{
     if(localStorage.getItem(BOOTSTRAP_VAL_KEY)) return;
     localStorage.setItem(BOOTSTRAP_VAL_KEY, '1');
@@ -416,29 +416,44 @@ function pushSquadra(force){
 }
 
 function pushVal(force){
-  if(!ctx.tecnicoId) return;
+  /* NON richiediamo piu' ctx.tecnicoId qui: prima questa funzione non
+     faceva nulla se non era impostato un tecnico "corrente" (cosa che
+     succede solo sulla pagina Giocatore durante la compilazione), quindi
+     la "sincronizzazione sicura" premuta dalla pagina Squadra non
+     riusciva MAI a inviare le valutazioni dei tecnici al cloud, silenzio-
+     samente. Ora inviamo la fetta di dati di OGNI tecnico gia' presente
+     in locale per ogni giocatore (ognuno resta comunque un campo separato
+     via merge:true, quindi due tecnici non si sovrascrivono mai a
+     vicenda, esattamente come prima). */
   var parsed = readJson(KEY_VAL);
   if(!parsed) return;
   var FieldValue = firebase.firestore.FieldValue;
   (parsed.players || []).forEach(function(p){
-    var slice = {}, hasAny = false;
+    var tecnicoIds = {};
     PERIOD_KEYS.forEach(function(period){
       var bt = p.valutazioni && p.valutazioni[period] && p.valutazioni[period].byTecnico;
-      var entry = bt && bt[ctx.tecnicoId];
-      if(entry){ slice[period] = entry; hasAny = true; }
+      if(bt) Object.keys(bt).forEach(function(tid){ tecnicoIds[tid] = true; });
     });
-    if(!hasAny) return;
-    var cacheKey = p.id + '|' + ctx.tecnicoId;
-    var json = JSON.stringify(slice);
-    if(!force && cache.valSlices[cacheKey] === json) return;
-    cache.valSlices[cacheKey] = json; saveCacheSoon();
-    var patch = { updatedAt: FieldValue.serverTimestamp(), device: getDeviceId() };
-    Object.keys(slice).forEach(function(period){
-      patch['valutazioni.' + period + '.byTecnico.' + ctx.tecnicoId] = slice[period];
+    Object.keys(tecnicoIds).forEach(function(tecnicoId){
+      var slice = {}, hasAny = false;
+      PERIOD_KEYS.forEach(function(period){
+        var bt = p.valutazioni && p.valutazioni[period] && p.valutazioni[period].byTecnico;
+        var entry = bt && bt[tecnicoId];
+        if(entry){ slice[period] = entry; hasAny = true; }
+      });
+      if(!hasAny) return;
+      var cacheKey = p.id + '|' + tecnicoId;
+      var json = JSON.stringify(slice);
+      if(!force && cache.valSlices[cacheKey] === json) return;
+      cache.valSlices[cacheKey] = json; saveCacheSoon();
+      var patch = { updatedAt: FieldValue.serverTimestamp(), device: getDeviceId() };
+      Object.keys(slice).forEach(function(period){
+        patch['valutazioni.' + period + '.byTecnico.' + tecnicoId] = slice[period];
+      });
+      db.collection('sync_val_players').doc(p.id).set(patch, { merge: true })
+        .then(function(){ setStatus('online', ''); })
+        .catch(function(err){ setStatus('offline', err && err.message); });
     });
-    db.collection('sync_val_players').doc(p.id).set(patch, { merge: true })
-      .then(function(){ setStatus('online', ''); })
-      .catch(function(err){ setStatus('offline', err && err.message); });
   });
 }
 
