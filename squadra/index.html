@@ -121,6 +121,7 @@ input,select,textarea{font-family:inherit;}
     <select id="seasonSelect"></select>
     <button id="newSeasonBtn">+ Nuova stagione</button>
     <button id="renameSeasonBtn">Rinomina</button>
+    <button id="deleteSeasonBtn" title="Elimina la stagione selezionata (utile per togliere le stagioni doppie create durante un ripristino)">&#128465; Elimina stagione</button>
     <div class="spacer"></div>
     <button class="riepilogo-link" onclick="goRiepilogo()">&#128202; Riepilogo Squadra</button>
   </div>
@@ -184,9 +185,18 @@ input,select,textarea{font-family:inherit;}
 var SS = window.SquadraStore;
 var qs = new URLSearchParams(window.location.search);
 
+/* La stagione indicata nell'URL (es. arrivando dal Riepilogo) va
+   applicata UNA sola volta, all'apertura della pagina: qs e' una
+   fotografia dell'URL presa al caricamento e non si aggiorna da
+   sola quando l'utente cambia stagione dal menu a tendina. Se
+   dopo ogni chiamata la si rileggesse sempre da li', un cambio di
+   stagione dal menu verrebbe silenziosamente annullato alla
+   prossima azione (rinomina, elimina, aggiungi giocatore...),
+   riportando alla stagione originale dell'URL invece di quella
+   appena selezionata. */
+var initialSeasonFromUrl = qs.get('season');
+if(initialSeasonFromUrl){ SS.setActiveSeasonId(initialSeasonFromUrl); }
 function getSeasonId(){
-  var fromUrl = qs.get('season');
-  if(fromUrl){ SS.setActiveSeasonId(fromUrl); }
   return SS.getActiveSeasonId();
 }
 
@@ -245,6 +255,29 @@ document.getElementById('renameSeasonBtn').addEventListener('click', function(){
   SS.renameSeason(id, label.trim());
   renderSeasons();
   showToast('Stagione rinominata.');
+});
+document.getElementById('deleteSeasonBtn').addEventListener('click', function(){
+  var id = getSeasonId();
+  var seasons = SS.getSeasons();
+  if(seasons.length<=1){
+    showToast('Non puoi eliminare l\'unica stagione rimasta.');
+    return;
+  }
+  var season = seasons.find(function(s){return s.id===id;});
+  if(!season) return;
+  var count = SS.getPlayers(id).length;
+  var warn = count>0
+    ? 'Contiene ' + count + ' giocator' + (count===1?'e':'i') + ': verranno eliminati insieme alla stagione, con le relative valutazioni e autovalutazioni. Questa azione non si puo\' annullare.'
+    : 'La stagione e\' vuota (nessun giocatore). Questa azione non si puo\' annullare.';
+  confirmModal(
+    'Eliminare la stagione "'+season.label+'"?',
+    warn + ' Nota: l\'eliminazione riguarda questo dispositivo (e il cloud); se la stessa stagione doppia compare anche su un altro dispositivo, eliminala allo stesso modo anche li\'.',
+    function(){
+      SS.deleteSeason(id);
+      renderSeasons(); renderRoster();
+      showToast('Stagione "'+season.label+'" eliminata.');
+    }
+  );
 });
 
 /* ---------------- Rosa ---------------- */

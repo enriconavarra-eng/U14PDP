@@ -178,11 +178,30 @@ function renameSeason(id, label){
 function deleteSeason(id){
   load();
   if(data.seasons.length<=1) return false;
+  var removedIds = data.players.filter(function(p){return p.seasonId===id;}).map(function(p){return p.id;});
   data.seasons = data.seasons.filter(function(s){return s.id!==id;});
   data.players = data.players.filter(function(p){return p.seasonId!==id;});
   if(data.activeSeasonId===id) data.activeSeasonId = data.seasons[0].id;
   save();
   notifyLocalChange();
+  /* stessa pulizia di deletePlayer() per ogni giocatore che apparteneva
+     solo a questa stagione: rimuove le sue valutazioni/autovalutazioni
+     locali e avvisa cloud-sync di cancellare i suoi documenti remoti,
+     cosi' non restano dati "orfani" ne' in locale ne' su Firestore. */
+  removedIds.forEach(function(pid){
+    [LEGACY_VAL_KEY, LEGACY_AUTO_KEY].forEach(function(key){
+      try{
+        var raw = localStorage.getItem(key);
+        if(!raw) return;
+        var parsed = JSON.parse(raw);
+        if(parsed && Array.isArray(parsed.players)){
+          parsed.players = parsed.players.filter(function(p){return p.id!==pid;});
+          localStorage.setItem(key, JSON.stringify(parsed));
+        }
+      }catch(e){}
+    });
+    if(window.RugbyCloudSync) window.RugbyCloudSync.notifyPlayerDeleted(pid);
+  });
   return true;
 }
 
