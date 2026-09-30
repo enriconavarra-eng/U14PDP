@@ -128,6 +128,40 @@ function setTecnico(id, nome){
    inviano comunque solo cio' che differisce dall'ultima cache nota. */
 var BOOTSTRAP_KEY = 'rugbyU14_cloudBootstrap_v1';
 var BOOTSTRAP_VAL_KEY = 'rugbyU14_cloudBootstrapVal_v1';
+var SAFE_MODE_KEY = 'rugbyU14_syncSafeMode';
+var SAFE_MODE_PUSH_WAIT_MS = 3500;
+
+/* ---------------- "sincronizzazione sicura" (invia prima di ricevere) ----------------
+   Attivata da un pulsante dell'app (vedi requestSafeModeOnNextLoad): al
+   prossimo avvio, PRIMA di ascoltare qualsiasi aggiornamento dal cloud,
+   invia tutto cio' che questo dispositivo ha gia' in locale (rosa,
+   autovalutazioni, e le valutazioni del tecnico configurato qui). Solo
+   dopo una breve attesa per dare tempo all'invio di arrivare, inizia ad
+   ascoltare gli aggiornamenti in arrivo dagli altri dispositivi. Serve a
+   evitare che, riattivando un dispositivo con dati buoni dopo un
+   problema altrove, riceva subito dati piu' vecchi o incompleti prima
+   di aver avuto la possibilita' di inviare i propri. */
+function isSafeModeRequested(){
+  try{ return localStorage.getItem(SAFE_MODE_KEY) === '1'; }catch(e){ return false; }
+}
+function clearSafeMode(){
+  try{ localStorage.removeItem(SAFE_MODE_KEY); }catch(e){}
+}
+function requestSafeModeOnNextLoad(){
+  try{ localStorage.setItem(SAFE_MODE_KEY, '1'); }catch(e){}
+}
+function forceFullPushThen(cb){
+  /* force=true: ignora la cache locale "gia' inviato" (che potrebbe
+     essere gia' allineata da un invio precedente) e riscrive comunque
+     tutto su Firestore, perche' lo scopo della modalita' sicura e'
+     proprio garantire che i dati di QUESTO dispositivo arrivino,
+     indipendentemente da cosa il dispositivo ricorda di aver gia'
+     inviato in passato. */
+  pushSquadra(true);
+  pushAuto(true);
+  if(ctx.tecnicoId) pushVal(true);
+  setTimeout(cb, SAFE_MODE_PUSH_WAIT_MS);
+}
 function maybeBootstrapPush(){
   if(!sdkReady) return;
   try{
@@ -180,11 +214,21 @@ function init(){
     auth.onAuthStateChanged(function(user){
       if(user){
         sdkReady = true;
-        setStatus('online', 'Sincronizzato');
-        attachListeners();
-        flushAllPending();
-        maybeBootstrapPush();
-        maybeBootstrapValPush();
+        if(isSafeModeRequested()){
+          setStatus('connecting', 'Modalita\' sicura: invio prima i dati di questo dispositivo, poi ricevo gli aggiornamenti...');
+          forceFullPushThen(function(){
+            clearSafeMode();
+            setStatus('online', 'Sincronizzato');
+            attachListeners();
+            flushAllPending();
+          });
+        } else {
+          setStatus('online', 'Sincronizzato');
+          attachListeners();
+          flushAllPending();
+          maybeBootstrapPush();
+          maybeBootstrapValPush();
+        }
       }
     });
     auth.signInAnonymously().catch(function(err){
@@ -328,12 +372,12 @@ function notifyPlayerDeleted(id){
   db.collection('sync_auto_players').doc(id).delete().catch(function(){});
 }
 
-function pushSquadra(){
+function pushSquadra(force){
   var parsed = readJson(KEY_SQUADRA);
   if(!parsed) return;
   var FieldValue = firebase.firestore.FieldValue;
   var metaJson = JSON.stringify(parsed.seasons || []);
-  if(cache.squadraMeta !== metaJson){
+  if(force || cache.squadraMeta !== metaJson){
     cache.squadraMeta = metaJson; saveCacheSoon();
     db.collection('sync_meta').doc('squadra').set({
       seasons: parsed.seasons || [], updatedAt: FieldValue.serverTimestamp(), device: getDeviceId()
@@ -341,7 +385,7 @@ function pushSquadra(){
   }
   (parsed.players || []).forEach(function(p){
     var json = JSON.stringify(p);
-    if(cache.squadraPlayers[p.id] === json) return;
+    if(!force && cache.squadraPlayers[p.id] === json) return;
     cache.squadraPlayers[p.id] = json; saveCacheSoon();
     db.collection('sync_squadra_players').doc(p.id).set({
       data: p, updatedAt: FieldValue.serverTimestamp(), device: getDeviceId()
@@ -349,7 +393,7 @@ function pushSquadra(){
   });
 }
 
-function pushVal(){
+function pushVal(force){
   if(!ctx.tecnicoId) return;
   var parsed = readJson(KEY_VAL);
   if(!parsed) return;
@@ -364,7 +408,7 @@ function pushVal(){
     if(!hasAny) return;
     var cacheKey = p.id + '|' + ctx.tecnicoId;
     var json = JSON.stringify(slice);
-    if(cache.valSlices[cacheKey] === json) return;
+    if(!force && cache.valSlices[cacheKey] === json) return;
     cache.valSlices[cacheKey] = json; saveCacheSoon();
     var patch = { updatedAt: FieldValue.serverTimestamp(), device: getDeviceId() };
     Object.keys(slice).forEach(function(period){
@@ -376,14 +420,14 @@ function pushVal(){
   });
 }
 
-function pushAuto(){
+function pushAuto(force){
   var parsed = readJson(KEY_AUTO);
   if(!parsed) return;
   var FieldValue = firebase.firestore.FieldValue;
   (parsed.players || []).forEach(function(p){
     if(!p.valutazioni) return;
     var json = JSON.stringify(p.valutazioni);
-    if(cache.autoPlayers[p.id] === json) return;
+    if(!force && cache.autoPlayers[p.id] === json) return;
     cache.autoPlayers[p.id] = json; saveCacheSoon();
     db.collection('sync_auto_players').doc(p.id).set({
       valutazioni: p.valutazioni, updatedAt: FieldValue.serverTimestamp(), device: getDeviceId()
@@ -421,7 +465,9 @@ window.RugbyCloudSync = {
   onDataChange: onDataChange,
   onStatusChange: onStatusChange,
   getStatus: getStatus,
-  mountStatusBadge: mountStatusBadge
+  mountStatusBadge: mountStatusBadge,
+  requestSafeModeOnNextLoad: requestSafeModeOnNextLoad,
+  isSafeModeRequested: isSafeModeRequested
 };
 
 init();

@@ -108,6 +108,10 @@ input,select,textarea{font-family:inherit;}
     <button onclick="window.location.href='../'">&#8962; Home</button>
     <button id="driveBackupBtn">&#9729; Drive</button>
     <button id="driveRestoreBtn">&#8635; Ripristina da Drive</button>
+    <button id="localRestoreBtn">&#128193; Ripristina da file locale</button>
+    <input type="file" id="localRestoreInput" accept=".json,application/json" multiple style="display:none">
+    <button id="localSaveBtn" title="Scarica subito una copia di rosa, valutazioni e autovalutazioni cosi' come sono ORA su questo dispositivo, senza toccare internet o il cloud">&#128190; Scarica copia locale</button>
+    <button id="safeSyncBtn" title="Da usare su un dispositivo con dati buoni, quando altrove potrebbero essercene di piu' vecchi o incompleti: al riavvio invia prima i dati di QUESTO dispositivo, e solo dopo inizia a ricevere">&#128274; Sincronizza in sicurezza</button>
   </div>
 </div>
 
@@ -441,6 +445,112 @@ function doRestoreFromDrive(){
   }
   next(0);
 }
+
+/* ---------------- Ripristino da file locale (backup_*.json salvati sul PC) ---------------- */
+function keyForLocalFilename(name){
+  var n = String(name||'').toLowerCase();
+  if(n.indexOf('autovalutazione') !== -1) return 'rugbyU14_autovalutazione_v1';
+  if(n.indexOf('valutazione') !== -1) return 'rugbyU14_valutazioni_v2';
+  if(n.indexOf('squadra') !== -1) return 'rugbyU14_squadra_v1';
+  return null;
+}
+document.getElementById('localRestoreBtn').addEventListener('click', function(){
+  confirmModal(
+    'Ripristinare i dati da file salvati sul PC?',
+    'Nella prossima finestra seleziona uno o piu\' file backup_squadra.json / backup_valutazione.json / backup_autovalutazione.json gia\' scaricati sul PC. Sovrascrive i dati corrispondenti su QUESTO dispositivo (e su tutti i dispositivi collegati tramite la sincronizzazione automatica, se attiva). Le valutazioni tecniche vengono ripristinate solo per il tecnico configurato su questo dispositivo.',
+    function(){ document.getElementById('localRestoreInput').click(); }
+  );
+});
+document.getElementById('localRestoreInput').addEventListener('change', function(e){
+  var fileList = Array.prototype.slice.call(e.target.files || []);
+  e.target.value = ''; // permette di riselezionare lo stesso file in seguito
+  if(!fileList.length) return;
+  var restored = [], failed = [];
+  function finish(){
+    if(restored.length){
+      showToast('Ripristinati da file locale: '+restored.join(', ')+(failed.length ? ' (non riconosciuti: '+failed.join(', ')+')' : '')+'. Ricarico la pagina...');
+      setTimeout(function(){ window.location.reload(); }, 1600);
+    } else {
+      showToast('Nessun file riconosciuto (i nomi devono contenere "squadra", "valutazione" o "autovalutazione").');
+    }
+  }
+  var SNAPSHOT_KEYS = ['rugbyU14_squadra_v1', 'rugbyU14_valutazioni_v2', 'rugbyU14_autovalutazione_v1'];
+  function next(i){
+    if(i >= fileList.length){ finish(); return; }
+    var file = fileList[i];
+    var reader = new FileReader();
+    reader.onload = function(){
+      var parsed;
+      try{ parsed = JSON.parse(reader.result); }
+      catch(e){ failed.push(file.name+' (file non valido)'); next(i+1); return; }
+      // Riconosce anche il file unico prodotto da "Scarica copia locale"
+      // (contiene direttamente le 3 chiavi come proprieta' di primo livello).
+      var isSnapshot = parsed && typeof parsed === 'object' && SNAPSHOT_KEYS.some(function(k){ return parsed[k] !== undefined; });
+      if(isSnapshot){
+        SNAPSHOT_KEYS.forEach(function(k){
+          if(parsed[k] === undefined || parsed[k] === null) return;
+          localStorage.setItem(k, parsed[k]);
+          if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange(k);
+          restored.push(k);
+        });
+        next(i+1);
+        return;
+      }
+      var key = keyForLocalFilename(file.name);
+      if(!key){ failed.push(file.name); next(i+1); return; }
+      localStorage.setItem(key, reader.result);
+      if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange(key);
+      restored.push(file.name);
+      next(i+1);
+    };
+    reader.onerror = function(){ failed.push(file.name); next(i+1); };
+    reader.readAsText(file);
+  }
+  next(0);
+});
+
+/* ---------------- Copia locale immediata (rete di sicurezza offline) ----------------
+   Scarica subito, in un solo file, esattamente quello che c'e' ORA su questo
+   dispositivo (rosa, valutazioni, autovalutazioni) cosi' come sta in questo
+   momento in localStorage. E' un'operazione puramente locale: non contatta
+   internet, non passa dal cloud, non puo' fallire per problemi di rete o di
+   account Google, e non viene toccata dalla sincronizzazione automatica. */
+document.getElementById('localSaveBtn').addEventListener('click', function(){
+  var snapshot = {
+    savedAt: new Date().toISOString(),
+    rugbyU14_squadra_v1: localStorage.getItem('rugbyU14_squadra_v1'),
+    rugbyU14_valutazioni_v2: localStorage.getItem('rugbyU14_valutazioni_v2'),
+    rugbyU14_autovalutazione_v1: localStorage.getItem('rugbyU14_autovalutazione_v1')
+  };
+  var blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var stamp = snapshot.savedAt.replace(/[:.]/g, '-');
+  a.href = url;
+  a.download = 'copia_locale_rugby_u14_' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  showToast('Copia locale scaricata. Conservala: non e\' collegata al cloud, e\' una fotografia di questo momento.');
+});
+
+/* ---------------- Sincronizzazione sicura (invia prima di ricevere) ---------------- */
+document.getElementById('safeSyncBtn').addEventListener('click', function(){
+  if(!window.RugbyCloudSync || !window.RugbyCloudSync.isConfigured()){
+    showToast('La sincronizzazione automatica non e\' configurata su questa app.');
+    return;
+  }
+  confirmModal(
+    'Sincronizzare in sicurezza questo dispositivo?',
+    'Usalo solo su un dispositivo di cui ti fidi (i cui dati sono giusti e completi), quando sospetti che altri dispositivi o il cloud abbiano dati piu\' vecchi o incompleti. La pagina si ricarichera\': al riavvio l\'app invia prima i dati di QUESTO dispositivo (rosa, valutazioni, autovalutazioni) e solo dopo qualche secondo inizia a ricevere gli aggiornamenti dagli altri dispositivi, cosi\' i tuoi dati arrivano al cloud prima di essere eventualmente mescolati con altro.',
+    function(){
+      window.RugbyCloudSync.requestSafeModeOnNextLoad();
+      showToast('Modalita\' sicura attivata. Ricarico la pagina...');
+      setTimeout(function(){ window.location.reload(); }, 700);
+    }
+  );
+});
 
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('../service-worker.js', {scope:'../'}).catch(function(){});
