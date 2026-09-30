@@ -32,10 +32,10 @@
       sincronizzano automaticamente tra loro, anche usati insieme.
 ============================================================ */
 window.RUGBY_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyByoxCRDUr17TkmBUEgRG5QQZwSLSym3so",
-  authDomain: "u14pdp.firebaseapp.com",
-  projectId: "u14pdp",
-  storageBucket: "u14pdp.firebasestorage.app",
-  messagingSenderId: "624280575412",
-  appId: "1:624280575412:web:f401a5f4fa11dbaccb66e1"
+  apiKey: "INSERISCI_QUI_LA_TUA_API_KEY",
+  authDomain: "INSERISCI_QUI.firebaseapp.com",
+  projectId: "INSERISCI_QUI",
+  storageBucket: "INSERISCI_QUI.appspot.com",
+  messagingSenderId: "INSERISCI_QUI",
+  appId: "INSERISCI_QUI"
 };

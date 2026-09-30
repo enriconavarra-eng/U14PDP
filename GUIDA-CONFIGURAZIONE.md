@@ -322,6 +322,14 @@ dispositivo in uso.
    questo dispositivo" se non configurato). Da questo momento, tutti i
    dispositivi che aprono l'app con questa configurazione si tengono
    allineati automaticamente, anche usati insieme.
+4. Se su un dispositivo avevi gia' inserito rosa, valutazioni o
+   autovalutazioni PRIMA di configurare la sincronizzazione, la prima
+   volta che quel dispositivo risulta "Sincronizzato" l'app invia da
+   sola tutto cio' che aveva gia' in locale, cosi' gli altri dispositivi
+   lo ricevono senza bisogno di ritoccare nulla a mano. Per le
+   valutazioni tecniche questo invio iniziale avviene solo dopo aver
+   aperto almeno una pagina Giocatore su quel dispositivo (serve a
+   sapere a quale tecnico appartengono).
 
 ### Come funziona in pratica (e i suoi limiti)
 

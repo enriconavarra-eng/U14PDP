@@ -112,6 +112,38 @@ function setTecnico(id, nome){
   ctx.tecnicoId = id;
   ctx.tecnicoNome = nome || id;
   if(pendingDirty[KEY_VAL]) debouncePush(KEY_VAL);
+  maybeBootstrapValPush();
+}
+
+/* ---------------- invio iniziale dei dati gia' presenti ----------------
+   Se questo dispositivo aveva gia' rosa/valutazioni/autovalutazioni
+   salvate in locale PRIMA di configurare la sincronizzazione (o prima
+   di essersi mai connesso con successo), quei dati non verrebbero mai
+   inviati al cloud da soli: notifyLocalChange() parte solo quando
+   l'utente modifica qualcosa. Per evitare che restino "intrappolati"
+   su un solo dispositivo, la prima volta che questo dispositivo si
+   connette con successo inviamo una volta sola tutto cio' che ha gia'
+   in locale. E' innocuo da richiamare piu' volte: i flag sotto fanno
+   si' che avvenga una sola volta per dispositivo, e le funzioni pushX
+   inviano comunque solo cio' che differisce dall'ultima cache nota. */
+var BOOTSTRAP_KEY = 'rugbyU14_cloudBootstrap_v1';
+var BOOTSTRAP_VAL_KEY = 'rugbyU14_cloudBootstrapVal_v1';
+function maybeBootstrapPush(){
+  if(!sdkReady) return;
+  try{
+    if(localStorage.getItem(BOOTSTRAP_KEY)) return;
+    localStorage.setItem(BOOTSTRAP_KEY, '1');
+  }catch(e){}
+  notifyLocalChange(KEY_SQUADRA);
+  notifyLocalChange(KEY_AUTO);
+}
+function maybeBootstrapValPush(){
+  if(!sdkReady || !ctx.tecnicoId) return;
+  try{
+    if(localStorage.getItem(BOOTSTRAP_VAL_KEY)) return;
+    localStorage.setItem(BOOTSTRAP_VAL_KEY, '1');
+  }catch(e){}
+  notifyLocalChange(KEY_VAL);
 }
 
 /* ---------------- caricamento SDK Firebase ---------------- */
@@ -151,6 +183,8 @@ function init(){
         setStatus('online', 'Sincronizzato');
         attachListeners();
         flushAllPending();
+        maybeBootstrapPush();
+        maybeBootstrapValPush();
       }
     });
     auth.signInAnonymously().catch(function(err){
