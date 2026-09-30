@@ -446,9 +446,21 @@ function pushVal(force){
       var json = JSON.stringify(slice);
       if(!force && cache.valSlices[cacheKey] === json) return;
       cache.valSlices[cacheKey] = json; saveCacheSoon();
-      var patch = { updatedAt: FieldValue.serverTimestamp(), device: getDeviceId() };
+      /* IMPORTANTE: qui serve un oggetto ANNIDATO vero (non chiavi con i
+         punti scritti come testo, es. "valutazioni.settembre.byTecnico.x"),
+         perche' set(dati, {merge:true}) — a differenza di update() — NON
+         interpreta i punti dentro il NOME di una chiave come separatori di
+         percorso: li tratterebbe come un unico nome di campo letterale.
+         Questo era un bug piu' vecchio (gia' presente prima delle
+         correzioni di oggi): i dati arrivavano su Firestore ma finivano
+         sotto un nome di campo sbagliato che l'app non riconosceva mai
+         come valutazioni. Con un oggetto annidato, il merge profondo di
+         set(...,{merge:true}) aggiorna solo il tecnico/periodo interessato
+         senza toccare gli altri. */
+      var patch = { updatedAt: FieldValue.serverTimestamp(), device: getDeviceId(), valutazioni: {} };
       Object.keys(slice).forEach(function(period){
-        patch['valutazioni.' + period + '.byTecnico.' + tecnicoId] = slice[period];
+        patch.valutazioni[period] = { byTecnico: {} };
+        patch.valutazioni[period].byTecnico[tecnicoId] = slice[period];
       });
       db.collection('sync_val_players').doc(p.id).set(patch, { merge: true })
         .then(function(){ setStatus('online', ''); })

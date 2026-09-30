@@ -1,7 +1,7 @@
 /* Service worker: cache locale per uso offline.
    Aumenta CACHE_NAME quando aggiorni i file per forzare il refresh
    sui tablet gia' installati. */
-var CACHE_NAME = 'rugby-u14-pasian-v13';
+var CACHE_NAME = 'rugby-u14-pasian-v14';
 var CORE_ASSETS = [
   './',
   './index.html',
