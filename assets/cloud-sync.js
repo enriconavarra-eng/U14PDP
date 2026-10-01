@@ -285,69 +285,113 @@ function attachListeners(){
       cache.squadraPlayers[id] = json;
       if(window.SquadraStore && window.SquadraStore.applyRemotePlayerUpsert(player)) any = true;
     });
-    if(any){ saveCacheSoon(); fireDataChange(KEY_SQUADRA); }
+    if(any){
+      saveCacheSoon(); fireDataChange(KEY_SQUADRA);
+      /* Un giocatore e' appena arrivato/aggiornato in rosa: se c'erano
+         valutazioni/autovalutazioni ricevute dal cloud PRIMA che questo
+         dispositivo conoscesse ancora questo giocatore (tipico su un
+         dispositivo appena svuotato, dove tutte le collection arrivano
+         piu' o meno nello stesso momento, in ordine non garantito),
+         proviamo subito a riapplicarle ora che la rosa esiste. */
+      retryPendingRemoteMerges();
+    }
   }, function(err){ setStatus('error', err && err.message); });
 
-  db.collection('sync_val_players').onSnapshot(function(snapshot){
+  /* ---------------- merge di un singolo documento valutazione/autovalutazione ----------------
+     Condiviso tra l'ascolto in tempo reale qui sotto e il "riprova" piu'
+     sopra (quando un giocatore compare in rosa dopo che i suoi dati
+     erano gia' arrivati dal cloud). Se il giocatore non e' (ancora)
+     conosciuto in rosa su questo dispositivo, il documento resta in
+     attesa in pendingValDocs/pendingAutoDocs: NON viene segnato come
+     "gia' ricevuto" in cache, quindi non resta mai bloccato per sempre. */
+  var pendingValDocs = {};  // id -> { valutazioni, json }
+  var pendingAutoDocs = {}; // id -> { valutazioni, json }
+
+  function mergeValDoc(id, remoteValObj, json){
+    var rosterPlayer = window.SquadraStore && window.SquadraStore.getPlayer ? window.SquadraStore.getPlayer(id) : null;
+    if(!rosterPlayer){ pendingValDocs[id] = { valutazioni: remoteValObj, json: json }; return false; }
+    delete pendingValDocs[id];
     var parsed = readJson(KEY_VAL);
-    if(!parsed || !Array.isArray(parsed.players)) return;
+    if(!parsed || !Array.isArray(parsed.players)) parsed = { players: [] };
+    var localPlayer = parsed.players.find(function(p){ return p.id === id; });
+    if(!localPlayer){
+      localPlayer = { id: id, nome: rosterPlayer.nome, valutazioni: {} };
+      parsed.players.push(localPlayer);
+    }
+    if(!localPlayer.valutazioni) localPlayer.valutazioni = {};
+    Object.keys(remoteValObj).forEach(function(period){
+      if(!localPlayer.valutazioni[period]) localPlayer.valutazioni[period] = { byTecnico: {} };
+      if(!localPlayer.valutazioni[period].byTecnico) localPlayer.valutazioni[period].byTecnico = {};
+      var remoteBt = remoteValObj[period].byTecnico || {};
+      Object.keys(remoteBt).forEach(function(tid){
+        localPlayer.valutazioni[period].byTecnico[tid] = remoteBt[tid];
+      });
+    });
+    writeJson(KEY_VAL, parsed);
+    cache.valReceived[id] = json;
+    return true;
+  }
+
+  function mergeAutoDoc(id, remoteValObj, json){
+    var rosterPlayer = window.SquadraStore && window.SquadraStore.getPlayer ? window.SquadraStore.getPlayer(id) : null;
+    if(!rosterPlayer){ pendingAutoDocs[id] = { valutazioni: remoteValObj, json: json }; return false; }
+    delete pendingAutoDocs[id];
+    var parsed = readJson(KEY_AUTO);
+    if(!parsed || !Array.isArray(parsed.players)) parsed = { players: [] };
+    var localPlayer = parsed.players.find(function(p){ return p.id === id; });
+    if(!localPlayer){
+      localPlayer = { id: id, nome: rosterPlayer.nome, valutazioni: {} };
+      parsed.players.push(localPlayer);
+    }
+    if(!localPlayer.valutazioni) localPlayer.valutazioni = {};
+    Object.keys(remoteValObj).forEach(function(period){ localPlayer.valutazioni[period] = remoteValObj[period]; });
+    writeJson(KEY_AUTO, parsed);
+    cache.autoPlayers[id] = json;
+    return true;
+  }
+
+  function retryPendingRemoteMerges(){
+    var anyVal = false, anyAuto = false;
+    Object.keys(pendingValDocs).forEach(function(id){
+      var entry = pendingValDocs[id];
+      if(mergeValDoc(id, entry.valutazioni, entry.json)) anyVal = true;
+    });
+    Object.keys(pendingAutoDocs).forEach(function(id){
+      var entry = pendingAutoDocs[id];
+      if(mergeAutoDoc(id, entry.valutazioni, entry.json)) anyAuto = true;
+    });
+    if(anyVal){ saveCacheSoon(); fireDataChange(KEY_VAL); }
+    if(anyAuto){ saveCacheSoon(); fireDataChange(KEY_AUTO); }
+  }
+
+  db.collection('sync_val_players').onSnapshot(function(snapshot){
     var any = false;
     snapshot.docChanges().forEach(function(change){
       var id = change.doc.id;
-      if(change.type === 'removed'){ delete cache.valReceived[id]; return; }
+      if(change.type === 'removed'){ delete cache.valReceived[id]; delete pendingValDocs[id]; return; }
       if(change.doc.metadata.hasPendingWrites) return;
       var remote = change.doc.data() || {};
-      var json = JSON.stringify(remote.valutazioni || {});
-      if(cache.valReceived[id] === json) return;
-      var localPlayer = parsed.players.find(function(p){ return p.id === id; });
-      /* Se il giocatore non esiste ancora in locale (es. aggiunto da poco
-         su un altro dispositivo, la sincronizzazione Squadra non ha ancora
-         creato la sua scheda qui), NON segniamo questi dati come "gia'
-         ricevuti": altrimenti resterebbero bloccati per sempre, perche' la
-         prossima volta lo stesso contenuto verrebbe scartato subito dal
-         controllo sopra, anche quando il giocatore nel frattempo esiste
-         gia'. Riproveremo alla prossima connessione (es. riapertura pagina),
-         quando la scheda Squadra sara' stata creata. */
-      if(!localPlayer) return;
-      cache.valReceived[id] = json;
-      if(!localPlayer.valutazioni) localPlayer.valutazioni = {};
       var remoteVal = remote.valutazioni || {};
-      Object.keys(remoteVal).forEach(function(period){
-        if(!localPlayer.valutazioni[period]) localPlayer.valutazioni[period] = { byTecnico: {} };
-        if(!localPlayer.valutazioni[period].byTecnico) localPlayer.valutazioni[period].byTecnico = {};
-        var remoteBt = remoteVal[period].byTecnico || {};
-        Object.keys(remoteBt).forEach(function(tid){
-          localPlayer.valutazioni[period].byTecnico[tid] = remoteBt[tid];
-        });
-      });
-      any = true;
+      var json = JSON.stringify(remoteVal);
+      if(cache.valReceived[id] === json) return;
+      if(mergeValDoc(id, remoteVal, json)) any = true;
     });
-    if(any){ writeJson(KEY_VAL, parsed); saveCacheSoon(); fireDataChange(KEY_VAL); }
+    if(any){ saveCacheSoon(); fireDataChange(KEY_VAL); }
   }, function(err){ setStatus('error', err && err.message); });
 
   db.collection('sync_auto_players').onSnapshot(function(snapshot){
-    var parsed = readJson(KEY_AUTO);
-    if(!parsed || !Array.isArray(parsed.players)) return;
     var any = false;
     snapshot.docChanges().forEach(function(change){
       var id = change.doc.id;
-      if(change.type === 'removed'){ delete cache.autoPlayers[id]; return; }
+      if(change.type === 'removed'){ delete cache.autoPlayers[id]; delete pendingAutoDocs[id]; return; }
       if(change.doc.metadata.hasPendingWrites) return;
       var remote = change.doc.data() || {};
-      var json = JSON.stringify(remote.valutazioni || {});
-      if(cache.autoPlayers[id] === json) return;
-      var localPlayer = parsed.players.find(function(p){ return p.id === id; });
-      /* Stesso motivo del listener sync_val_players qui sopra: non segnare
-         come "gia' ricevuto" se il giocatore non esiste ancora in locale,
-         altrimenti questi dati resterebbero bloccati per sempre. */
-      if(!localPlayer) return;
-      cache.autoPlayers[id] = json;
-      if(!localPlayer.valutazioni) localPlayer.valutazioni = {};
       var remoteVal = remote.valutazioni || {};
-      Object.keys(remoteVal).forEach(function(period){ localPlayer.valutazioni[period] = remoteVal[period]; });
-      any = true;
+      var json = JSON.stringify(remoteVal);
+      if(cache.autoPlayers[id] === json) return;
+      if(mergeAutoDoc(id, remoteVal, json)) any = true;
     });
-    if(any){ writeJson(KEY_AUTO, parsed); saveCacheSoon(); fireDataChange(KEY_AUTO); }
+    if(any){ saveCacheSoon(); fireDataChange(KEY_AUTO); }
   }, function(err){ setStatus('error', err && err.message); });
 
   /* nota: 'FieldValue' e' referenziata solo nelle funzioni di push

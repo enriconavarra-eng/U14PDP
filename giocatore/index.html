@@ -416,10 +416,24 @@ function loadAll(){
   if(qs.get('season')) SS.setActiveSeasonId(qs.get('season'));
   state.activeSeasonId = SS.getActiveSeasonId();
 
+  var valJsonBefore = JSON.stringify(valData);
+  var autoJsonBefore = JSON.stringify(autoData);
+
   SS.syncAppPlayers(valData.players, state.activeSeasonId, { richFields:true, createLocal:function(sp){ return newValPlayer(sp.nome, sp.id); } });
   valData.players.forEach(ensureValPlayerShape);
   SS.syncAppPlayers(autoData.players, state.activeSeasonId, { richFields:false, createLocal:function(sp){ return newAutoPlayer(sp.nome, sp.id); } });
   autoData.players.forEach(ensureAutoPlayerShape);
+
+  /* SS.syncAppPlayers() qui sopra puo' aver creato nuove voci (in
+     memoria) per giocatori gia' in rosa ma senza ancora una scheda
+     locale su questo dispositivo (es. chiave mai scritta qui, o
+     azzerata da una pulizia dati del browser). Se non le salviamo
+     subito, restano SOLO in memoria: la pagina Riepilogo e la
+     sincronizzazione cloud leggono la chiave direttamente da
+     localStorage, quindi senza questo salvataggio non vedrebbero mai
+     queste voci. */
+  if(JSON.stringify(valData) !== valJsonBefore) saveVal();
+  if(JSON.stringify(autoData) !== autoJsonBefore) saveAuto();
 }
 
 /* ---------------- Render ---------------- */
