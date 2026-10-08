@@ -100,6 +100,16 @@ input,select,textarea{font-family:inherit;}
 .field textarea{resize:vertical;min-height:70px;}
 .field input:focus,.field textarea:focus{outline:2px solid var(--pitch);outline-offset:0;}
 
+.fields-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media (max-width:480px){.fields-row{grid-template-columns:1fr;}}
+
+.growth-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+.growth-table th,.growth-table td{padding:9px 8px;text-align:center;border-bottom:1px solid var(--pitch-line);}
+.growth-table th:first-child,.growth-table td:first-child{text-align:left;color:var(--ink-soft);font-weight:600;}
+.growth-table th{color:var(--ink-soft);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:0.3px;}
+.growth-table td.current-period{background:var(--gold-soft);font-weight:700;border-radius:6px;}
+.growth-table .delta{font-size:11px;font-weight:700;color:var(--high);margin-left:4px;}
+
 .pdf-btn{background:var(--pitch);color:#fff;border:none;padding:10px 16px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;margin-bottom:14px;}
 canvas{max-width:100%;display:block;margin:0 auto 18px auto;}
 .legend{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-bottom:18px;font-size:12.5px;}
@@ -281,12 +291,14 @@ var AUTO_SKILL_GROUPS = [
 
 var VAL_KEY = 'rugbyU14_valutazioni_v2';
 var AUTO_KEY = 'rugbyU14_autovalutazione_v1';
+var FISICO_KEY = 'rugbyU14_fisico_v1';
 var TECNICO_NOME_KEY = 'rugbyU14_tecnicoNome';
 
 var state = { activePeriod: 'settembre', activeSeasonId: null, activeTab: 'panoramica' };
 var CURRENT_TECNICO = null;
 var valData = { players: [] };
 var autoData = { players: [] };
+var fisicoData = { players: [] };
 
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function fmt(v){ return (v===null||v===undefined||isNaN(v)) ? '-' : v.toFixed(1); }
@@ -405,24 +417,54 @@ function autoTotalAverage(scores){
   return n>0 ? sum/n : null;
 }
 
+/* ---------------- Dati: Crescita fisica (altezza/peso per periodo) ----------------
+   Indipendente da chi la compila (nessun "tecnico corrente" coinvolto,
+   a differenza della scheda Valutazione): e' un singolo dato di fatto
+   per giocatore e periodo, sincronizzato in blocco come l'Autovalutazione. */
+function ensureFisicoPlayerShape(p){
+  if(!p.misure) p.misure = {};
+  PERIODS.forEach(function(per){
+    if(!p.misure[per.key]) p.misure[per.key] = { altezza:'', peso:'' };
+    if(p.misure[per.key].altezza===undefined) p.misure[per.key].altezza = '';
+    if(p.misure[per.key].peso===undefined) p.misure[per.key].peso = '';
+  });
+  return p;
+}
+function newFisicoPlayer(nome, id){
+  var p = { id: id || uid(), nome: nome || 'Nuovo giocatore', misure:{} };
+  ensureFisicoPlayerShape(p);
+  return p;
+}
+function fisicoPlayer(){ return fisicoData.players.find(function(p){ return p.id===playerId; }); }
+function getFisicoPeriodData(period){ var p = fisicoPlayer(); ensureFisicoPlayerShape(p); return p.misure[period || state.activePeriod]; }
+function saveFisico(){
+  try{ localStorage.setItem(FISICO_KEY, JSON.stringify(fisicoData)); }catch(e){}
+  if(window.RugbyCloudSync) window.RugbyCloudSync.notifyLocalChange(FISICO_KEY);
+}
+
 /* ---------------- Caricamento ---------------- */
 function loadAll(){
   loadCurrentTecnico();
   try{ var raw = localStorage.getItem(VAL_KEY); if(raw){ valData = JSON.parse(raw); if(!valData.players) valData.players=[]; } }catch(e){ valData = {players:[]}; }
   try{ var raw2 = localStorage.getItem(AUTO_KEY); if(raw2){ autoData = JSON.parse(raw2); if(!autoData.players) autoData.players=[]; } }catch(e){ autoData = {players:[]}; }
+  try{ var raw3 = localStorage.getItem(FISICO_KEY); if(raw3){ fisicoData = JSON.parse(raw3); if(!fisicoData.players) fisicoData.players=[]; } }catch(e){ fisicoData = {players:[]}; }
   valData.players.forEach(ensureValPlayerShape);
   autoData.players.forEach(ensureAutoPlayerShape);
+  fisicoData.players.forEach(ensureFisicoPlayerShape);
 
   if(qs.get('season')) SS.setActiveSeasonId(qs.get('season'));
   state.activeSeasonId = SS.getActiveSeasonId();
 
   var valJsonBefore = JSON.stringify(valData);
   var autoJsonBefore = JSON.stringify(autoData);
+  var fisicoJsonBefore = JSON.stringify(fisicoData);
 
   SS.syncAppPlayers(valData.players, state.activeSeasonId, { richFields:true, createLocal:function(sp){ return newValPlayer(sp.nome, sp.id); } });
   valData.players.forEach(ensureValPlayerShape);
   SS.syncAppPlayers(autoData.players, state.activeSeasonId, { richFields:false, createLocal:function(sp){ return newAutoPlayer(sp.nome, sp.id); } });
   autoData.players.forEach(ensureAutoPlayerShape);
+  SS.syncAppPlayers(fisicoData.players, state.activeSeasonId, { richFields:false, createLocal:function(sp){ return newFisicoPlayer(sp.nome, sp.id); } });
+  fisicoData.players.forEach(ensureFisicoPlayerShape);
 
   /* SS.syncAppPlayers() qui sopra puo' aver creato nuove voci (in
      memoria) per giocatori gia' in rosa ma senza ancora una scheda
@@ -434,6 +476,7 @@ function loadAll(){
      queste voci. */
   if(JSON.stringify(valData) !== valJsonBefore) saveVal();
   if(JSON.stringify(autoData) !== autoJsonBefore) saveAuto();
+  if(JSON.stringify(fisicoData) !== fisicoJsonBefore) saveFisico();
 }
 
 /* ---------------- Render ---------------- */
@@ -460,7 +503,7 @@ function renderAll(){
 
   html += '<div class="filters"><div class="period-switch" id="periodSwitch"></div></div>';
   html += '<div class="tabs" id="tabsWrap">'+
-    tabBtn('panoramica','Panoramica')+ tabBtn('valutazione','Valutazione')+ tabBtn('autovalutazione','Autovalutazione')+ tabBtn('obiettivi','Obiettivi') +
+    tabBtn('panoramica','Panoramica')+ tabBtn('valutazione','Valutazione')+ tabBtn('autovalutazione','Autovalutazione')+ tabBtn('crescita','Crescita')+ tabBtn('obiettivi','Obiettivi') +
   '</div>';
   html += '<div id="tabContent"></div>';
 
@@ -487,6 +530,7 @@ function renderTabContent(sharedPlayer){
   var host = document.getElementById('tabContent');
   if(state.activeTab==='valutazione') host.innerHTML = renderValutazioneTab();
   else if(state.activeTab==='autovalutazione') host.innerHTML = renderAutovalutazioneTab();
+  else if(state.activeTab==='crescita') host.innerHTML = renderCrescitaTab();
   else if(state.activeTab==='obiettivi') host.innerHTML = renderObiettiviTab();
   else host.innerHTML = renderPanoramicaTab(sharedPlayer);
   attachTabEvents(sharedPlayer);
@@ -554,6 +598,50 @@ function renderAutovalutazioneTab(){
     });
     html += '</div>';
   });
+  return html;
+}
+
+/* ---------- Tab: Crescita (altezza/peso per periodo) ---------- */
+function growthTableHtml(){
+  var html = '<table class="growth-table"><thead><tr><th>Misura</th>'+
+    PERIODS.map(function(p){ return '<th>'+p.label+'</th>'; }).join('')+
+  '</tr></thead><tbody>';
+  ['altezza','peso'].forEach(function(field){
+    var label = field==='altezza' ? 'Altezza (cm)' : 'Peso (kg)';
+    var prev = null;
+    html += '<tr><td>'+label+'</td>';
+    PERIODS.forEach(function(p){
+      var pd = getFisicoPeriodData(p.key);
+      var raw = pd[field];
+      var v = (raw!==undefined && raw!==null && raw!=='') ? Number(raw) : null;
+      var cellTxt = (v===null || isNaN(v)) ? '-' : String(v);
+      var deltaTxt = '';
+      if(v!==null && !isNaN(v) && prev!==null){
+        var d = Math.round((v-prev)*10)/10;
+        if(d!==0) deltaTxt = '<span class="delta">('+(d>0?'+':'')+d+')</span>';
+      }
+      if(v!==null && !isNaN(v)) prev = v;
+      html += '<td'+(p.key===state.activePeriod?' class="current-period"':'')+'>'+cellTxt+' '+deltaTxt+'</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+function renderCrescitaTab(){
+  var pd = getFisicoPeriodData(state.activePeriod);
+  var html = '<div class="intro-note">Registra altezza e peso a ogni valutazione per seguire la crescita fisica del giocatore nel corso della stagione. Il dato non dipende dal tecnico che lo inserisce.</div>'+
+  '<div class="card">'+
+    '<div class="fields-row">'+
+      '<div class="field"><label>Altezza (cm) — '+escapeHtml(periodLabel(state.activePeriod))+'</label>'+
+        '<input type="number" inputmode="decimal" step="0.1" min="0" max="250" id="fAltezza" placeholder="Es: 158" value="'+escapeHtml(pd.altezza)+'"></div>'+
+      '<div class="field"><label>Peso (kg) — '+escapeHtml(periodLabel(state.activePeriod))+'</label>'+
+        '<input type="number" inputmode="decimal" step="0.1" min="0" max="200" id="fPeso" placeholder="Es: 48" value="'+escapeHtml(pd.peso)+'"></div>'+
+    '</div>'+
+  '</div>'+
+  '<div class="card"><div class="group-title"><h3 style="font-family:inherit;font-size:16px;margin:0;">Andamento stagione</h3></div>'+
+    '<div id="growthTableHost">'+growthTableHtml()+'</div>'+
+  '</div>';
   return html;
 }
 
@@ -686,6 +774,17 @@ function attachTabEvents(sharedPlayer){
       });
     });
   }
+  if(state.activeTab==='crescita'){
+    var pdFisico = getFisicoPeriodData(state.activePeriod);
+    var fAltezza = document.getElementById('fAltezza');
+    var fPeso = document.getElementById('fPeso');
+    function refreshGrowthTable(){
+      var host = document.getElementById('growthTableHost');
+      if(host) host.innerHTML = growthTableHtml();
+    }
+    fAltezza.addEventListener('input', function(){ pdFisico.altezza = fAltezza.value; saveFisico(); refreshGrowthTable(); });
+    fPeso.addEventListener('input', function(){ pdFisico.peso = fPeso.value; saveFisico(); refreshGrowthTable(); });
+  }
   if(state.activeTab==='obiettivi'){
     var pd = getAutoPeriodData(state.activePeriod);
     var fObP = document.getElementById('fObPersonale');
@@ -720,6 +819,7 @@ if(playerId){
   if(window.RugbyCloudSync){
     window.RugbyCloudSync.onDataChange(VAL_KEY, function(){ loadAll(); renderAll(); });
     window.RugbyCloudSync.onDataChange(AUTO_KEY, function(){ loadAll(); renderAll(); });
+    window.RugbyCloudSync.onDataChange(FISICO_KEY, function(){ loadAll(); renderAll(); });
   }
   if(SS && SS.onChange){
     SS.onChange(function(){ renderAll(); });

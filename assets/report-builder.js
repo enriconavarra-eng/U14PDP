@@ -39,6 +39,37 @@ function playerHeaderHtml(player){
   '</div>';
 }
 
+/* Tabellina con altezza/peso nei tre periodi della stagione, per
+   seguire la crescita fisica del giocatore. Non mostrata se non ci
+   sono affatto misure salvate. */
+function fisicoCardHtml(player){
+  var ED = window.EvalData;
+  if(!ED.fisicoHasAnyData(player.id)) return '';
+  var series = ED.fisicoSeries(player.id);
+  function fmtNum(v, suffix){ return (v===null||v===undefined||isNaN(v)) ? '-' : (v + suffix); }
+  function deltaCell(curr, prev){
+    if(curr===null || prev===null) return '';
+    var d = Math.round((curr-prev)*10)/10;
+    if(d===0) return '';
+    return ' <span class="rb-delta">('+(d>0?'+':'')+d+')</span>';
+  }
+  var prevAltezza = null, prevPeso = null;
+  var altezzaCells = '', pesoCells = '';
+  series.forEach(function(row){
+    altezzaCells += '<td class="rb-mono">'+fmtNum(row.altezza,' cm')+deltaCell(row.altezza, prevAltezza)+'</td>';
+    pesoCells += '<td class="rb-mono">'+fmtNum(row.peso,' kg')+deltaCell(row.peso, prevPeso)+'</td>';
+    if(row.altezza!==null) prevAltezza = row.altezza;
+    if(row.peso!==null) prevPeso = row.peso;
+  });
+  return '<div class="rb-card"><h3>Crescita fisica</h3>'+
+    '<table class="rb-table"><thead><tr><th>Misura</th>'+
+      series.map(function(row){ return '<th>'+esc(row.label)+'</th>'; }).join('')+
+    '</tr></thead><tbody>'+
+    '<tr><td>Altezza</td>'+altezzaCells+'</tr>'+
+    '<tr><td>Peso</td>'+pesoCells+'</tr>'+
+    '</tbody></table></div>';
+}
+
 /* Sezione completa per un giocatore: dati, valutazione tecnica,
    autovalutazione, confronto. periodKey e' una delle chiavi di
    EvalData.PERIODS ('settembre'|'gennaio'|'maggio'). */
@@ -54,6 +85,8 @@ function playerSectionHtml(player, periodKey, opts){
 
   var html = opts.skipHeader ? '' : playerHeaderHtml(player);
   html += '<div class="rb-period-banner">Periodo: '+esc(periodLbl)+'</div>';
+
+  html += fisicoCardHtml(player);
 
   html += '<div class="rb-grid2">';
 
@@ -152,6 +185,7 @@ var PAGE_CSS = ''+
 '.rb-bar-fill{height:100%;}'+
 '.rb-total{margin-top:8px;font-size:12.5px;}'+
 '.rb-mono{font-family:Consolas,Menlo,monospace;font-weight:700;}'+
+'.rb-delta{font-weight:600;color:#2E8F72;}'+
 '.rb-goals{margin-top:10px;font-size:12px;line-height:1.5;}'+
 '.rb-goals p{margin:0 0 6px 0;}'+
 '.rb-table{width:100%;border-collapse:collapse;font-size:12.5px;}'+
@@ -214,6 +248,7 @@ var CARD_CSS = ''+
 '.rb-bar-fill{height:100%;}'+
 '.rb-total{margin-top:8px;font-size:12.5px;}'+
 '.rb-mono{font-family:Consolas,Menlo,monospace;font-weight:700;}'+
+'.rb-delta{font-weight:600;color:#2E8F72;}'+
 '.rb-goals{margin-top:10px;font-size:12px;line-height:1.5;}'+
 '.rb-goals p{margin:0 0 6px 0;}'+
 '.rb-table{width:100%;border-collapse:collapse;font-size:12.5px;}'+

@@ -4,13 +4,15 @@
    Autovalutazione), usata dalle pagine Squadra/Riepilogo/Confronto
    per leggere i punteggi senza dover caricare le app complete.
    Le due app originali restano invariate e continuano a scrivere
-   negli stessi due localStorage key qui sotto.
+   negli stessi due localStorage key qui sotto. Legge anche le
+   misure fisiche (altezza/peso) salvate dalla scheda Giocatore.
 ============================================================ */
 (function(window){
 "use strict";
 
 var VAL_KEY = 'rugbyU14_valutazioni_v2';
 var AUTO_KEY = 'rugbyU14_autovalutazione_v1';
+var FISICO_KEY = 'rugbyU14_fisico_v1';
 
 var PERIODS = [
   {key:'settembre', label:'Settembre'},
@@ -177,6 +179,30 @@ function autoGoals(playerId, periodKey){
   return { obiettivoPersonale: pd.obiettivoPersonale||'', obiettivoTecnico: pd.obiettivoTecnico||'', ruoloDesiderato: pd.ruoloDesiderato||'' };
 }
 
+/* ---- Lettura misure fisiche (altezza/peso per periodo) ---- */
+function fisicoPlayerRaw(playerId){
+  return readRaw(FISICO_KEY).find(function(p){return p.id===playerId;}) || null;
+}
+/* Ritorna {altezza, peso} (numeri o null) per il periodo indicato. */
+function fisicoMisure(playerId, periodKey){
+  var p = fisicoPlayerRaw(playerId);
+  var pd = p && p.misure && p.misure[periodKey];
+  var altezza = pd && pd.altezza !== undefined && pd.altezza !== null && pd.altezza !== '' ? Number(pd.altezza) : null;
+  var peso = pd && pd.peso !== undefined && pd.peso !== null && pd.peso !== '' ? Number(pd.peso) : null;
+  return { altezza: (altezza!==null && !isNaN(altezza)) ? altezza : null, peso: (peso!==null && !isNaN(peso)) ? peso : null };
+}
+/* Tutte le misure del giocatore, un oggetto per periodo, nell'ordine
+   di PERIODS: utile per mostrare la crescita nel corso della stagione. */
+function fisicoSeries(playerId){
+  return PERIODS.map(function(per){
+    var m = fisicoMisure(playerId, per.key);
+    return { key: per.key, label: per.label, altezza: m.altezza, peso: m.peso };
+  });
+}
+function fisicoHasAnyData(playerId){
+  return fisicoSeries(playerId).some(function(row){ return row.altezza!==null || row.peso!==null; });
+}
+
 window.EvalData = {
   PERIODS: PERIODS,
   VAL_GROUPS: VAL_GROUPS,
@@ -192,6 +218,9 @@ window.EvalData = {
   autoTotalAverage: autoTotalAverage,
   autoHasData: autoHasData,
   autoGoals: autoGoals,
+  fisicoMisure: fisicoMisure,
+  fisicoSeries: fisicoSeries,
+  fisicoHasAnyData: fisicoHasAnyData,
   fmt: fmt
 };
 

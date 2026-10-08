@@ -10,11 +10,11 @@
 
    Quando invece e' configurato:
    - ogni dispositivo si autentica in modo anonimo su Firebase;
-   - i dati della rosa (Squadra), delle valutazioni tecniche e delle
-     autovalutazioni vengono specchiati in Firestore, un documento
-     per giocatore (cosi' due tecnici che lavorano su DUE giocatori
-     diversi, o anche sullo stesso in momenti diversi, non si
-     sovrascrivono mai a vicenda);
+   - i dati della rosa (Squadra), delle valutazioni tecniche, delle
+     autovalutazioni e delle misure fisiche (altezza/peso) vengono
+     specchiati in Firestore, un documento per giocatore (cosi' due
+     tecnici che lavorano su DUE giocatori diversi, o anche sullo
+     stesso in momenti diversi, non si sovrascrivono mai a vicenda);
    - per la scheda Valutazione, ogni tecnico scrive SOLO la propria
      fetta di dati (identificata dal suo nome/tecnicoId), quindi due
      tecnici possono valutare lo stesso giocatore anche nello stesso
@@ -28,6 +28,7 @@
 var KEY_SQUADRA = 'rugbyU14_squadra_v1';
 var KEY_VAL = 'rugbyU14_valutazioni_v2';
 var KEY_AUTO = 'rugbyU14_autovalutazione_v1';
+var KEY_FISICO = 'rugbyU14_fisico_v1';
 var CACHE_KEY = 'rugbyU14_cloudCache_v1';
 var DEVICE_KEY = 'rugbyU14_deviceId';
 var PERIOD_KEYS = ['settembre', 'gennaio', 'maggio'];
@@ -58,7 +59,7 @@ var pendingDirty = {};
    o nel cloud, solo re-inviato/re-scaricato una volta). */
 var CACHE_SCHEMA_VERSION = 2;
 function defaultCache(){
-  return { schemaVersion: CACHE_SCHEMA_VERSION, squadraMeta: null, squadraPlayers: {}, valSlices: {}, valReceived: {}, autoPlayers: {} };
+  return { schemaVersion: CACHE_SCHEMA_VERSION, squadraMeta: null, squadraPlayers: {}, valSlices: {}, valReceived: {}, autoPlayers: {}, fisicoPlayers: {} };
 }
 function loadCache(){
   var c = defaultCache();
@@ -127,15 +128,16 @@ function setTecnico(id, nome){
 }
 
 /* ---------------- invio iniziale dei dati gia' presenti ----------------
-   Se questo dispositivo aveva gia' rosa/valutazioni/autovalutazioni
-   salvate in locale PRIMA di configurare la sincronizzazione (o prima
-   di essersi mai connesso con successo), quei dati non verrebbero mai
-   inviati al cloud da soli: notifyLocalChange() parte solo quando
-   l'utente modifica qualcosa. Per evitare che restino "intrappolati"
-   su un solo dispositivo, la prima volta che questo dispositivo si
-   connette con successo inviamo una volta sola tutto cio' che ha gia'
-   in locale. E' innocuo da richiamare piu' volte: i flag sotto fanno
-   si' che avvenga una sola volta per dispositivo, e le funzioni pushX
+   Se questo dispositivo aveva gia' rosa/valutazioni/autovalutazioni/
+   misure fisiche salvate in locale PRIMA di configurare la
+   sincronizzazione (o prima di essersi mai connesso con successo),
+   quei dati non verrebbero mai inviati al cloud da soli:
+   notifyLocalChange() parte solo quando l'utente modifica qualcosa.
+   Per evitare che restino "intrappolati" su un solo dispositivo, la
+   prima volta che questo dispositivo si connette con successo
+   inviamo una volta sola tutto cio' che ha gia' in locale. E'
+   innocuo da richiamare piu' volte: i flag sotto fanno si' che
+   avvenga una sola volta per dispositivo, e le funzioni pushX
    inviano comunque solo cio' che differisce dall'ultima cache nota. */
 var BOOTSTRAP_KEY = 'rugbyU14_cloudBootstrap_v1';
 var BOOTSTRAP_VAL_KEY = 'rugbyU14_cloudBootstrapVal_v1';
@@ -146,12 +148,13 @@ var SAFE_MODE_PUSH_WAIT_MS = 3500;
    Attivata da un pulsante dell'app (vedi requestSafeModeOnNextLoad): al
    prossimo avvio, PRIMA di ascoltare qualsiasi aggiornamento dal cloud,
    invia tutto cio' che questo dispositivo ha gia' in locale (rosa,
-   autovalutazioni, e le valutazioni del tecnico configurato qui). Solo
-   dopo una breve attesa per dare tempo all'invio di arrivare, inizia ad
-   ascoltare gli aggiornamenti in arrivo dagli altri dispositivi. Serve a
-   evitare che, riattivando un dispositivo con dati buoni dopo un
-   problema altrove, riceva subito dati piu' vecchi o incompleti prima
-   di aver avuto la possibilita' di inviare i propri. */
+   autovalutazioni, misure fisiche, e le valutazioni del tecnico
+   configurato qui). Solo dopo una breve attesa per dare tempo
+   all'invio di arrivare, inizia ad ascoltare gli aggiornamenti in
+   arrivo dagli altri dispositivi. Serve a evitare che, riattivando un
+   dispositivo con dati buoni dopo un problema altrove, riceva subito
+   dati piu' vecchi o incompleti prima di aver avuto la possibilita'
+   di inviare i propri. */
 function isSafeModeRequested(){
   try{ return localStorage.getItem(SAFE_MODE_KEY) === '1'; }catch(e){ return false; }
 }
@@ -170,6 +173,7 @@ function forceFullPushThen(cb){
      inviato in passato. */
   pushSquadra(true);
   pushAuto(true);
+  pushFisico(true);
   pushVal(true);
   setTimeout(cb, SAFE_MODE_PUSH_WAIT_MS);
 }
@@ -181,6 +185,7 @@ function maybeBootstrapPush(){
   }catch(e){}
   notifyLocalChange(KEY_SQUADRA);
   notifyLocalChange(KEY_AUTO);
+  notifyLocalChange(KEY_FISICO);
 }
 function maybeBootstrapValPush(){
   if(!sdkReady) return;
@@ -288,24 +293,27 @@ function attachListeners(){
     if(any){
       saveCacheSoon(); fireDataChange(KEY_SQUADRA);
       /* Un giocatore e' appena arrivato/aggiornato in rosa: se c'erano
-         valutazioni/autovalutazioni ricevute dal cloud PRIMA che questo
-         dispositivo conoscesse ancora questo giocatore (tipico su un
-         dispositivo appena svuotato, dove tutte le collection arrivano
-         piu' o meno nello stesso momento, in ordine non garantito),
-         proviamo subito a riapplicarle ora che la rosa esiste. */
+         valutazioni/autovalutazioni/misure fisiche ricevute dal cloud
+         PRIMA che questo dispositivo conoscesse ancora questo
+         giocatore (tipico su un dispositivo appena svuotato, dove
+         tutte le collection arrivano piu' o meno nello stesso momento,
+         in ordine non garantito), proviamo subito a riapplicarle ora
+         che la rosa esiste. */
       retryPendingRemoteMerges();
     }
   }, function(err){ setStatus('error', err && err.message); });
 
-  /* ---------------- merge di un singolo documento valutazione/autovalutazione ----------------
+  /* ---------------- merge di un singolo documento valutazione/autovalutazione/fisico ----------------
      Condiviso tra l'ascolto in tempo reale qui sotto e il "riprova" piu'
      sopra (quando un giocatore compare in rosa dopo che i suoi dati
      erano gia' arrivati dal cloud). Se il giocatore non e' (ancora)
      conosciuto in rosa su questo dispositivo, il documento resta in
-     attesa in pendingValDocs/pendingAutoDocs: NON viene segnato come
-     "gia' ricevuto" in cache, quindi non resta mai bloccato per sempre. */
-  var pendingValDocs = {};  // id -> { valutazioni, json }
-  var pendingAutoDocs = {}; // id -> { valutazioni, json }
+     attesa in pendingValDocs/pendingAutoDocs/pendingFisicoDocs: NON
+     viene segnato come "gia' ricevuto" in cache, quindi non resta mai
+     bloccato per sempre. */
+  var pendingValDocs = {};    // id -> { valutazioni, json }
+  var pendingAutoDocs = {};   // id -> { valutazioni, json }
+  var pendingFisicoDocs = {}; // id -> { misure, json }
 
   function mergeValDoc(id, remoteValObj, json){
     var rosterPlayer = window.SquadraStore && window.SquadraStore.getPlayer ? window.SquadraStore.getPlayer(id) : null;
@@ -350,8 +358,26 @@ function attachListeners(){
     return true;
   }
 
+  function mergeFisicoDoc(id, remoteMisureObj, json){
+    var rosterPlayer = window.SquadraStore && window.SquadraStore.getPlayer ? window.SquadraStore.getPlayer(id) : null;
+    if(!rosterPlayer){ pendingFisicoDocs[id] = { misure: remoteMisureObj, json: json }; return false; }
+    delete pendingFisicoDocs[id];
+    var parsed = readJson(KEY_FISICO);
+    if(!parsed || !Array.isArray(parsed.players)) parsed = { players: [] };
+    var localPlayer = parsed.players.find(function(p){ return p.id === id; });
+    if(!localPlayer){
+      localPlayer = { id: id, nome: rosterPlayer.nome, misure: {} };
+      parsed.players.push(localPlayer);
+    }
+    if(!localPlayer.misure) localPlayer.misure = {};
+    Object.keys(remoteMisureObj).forEach(function(period){ localPlayer.misure[period] = remoteMisureObj[period]; });
+    writeJson(KEY_FISICO, parsed);
+    cache.fisicoPlayers[id] = json;
+    return true;
+  }
+
   function retryPendingRemoteMerges(){
-    var anyVal = false, anyAuto = false;
+    var anyVal = false, anyAuto = false, anyFisico = false;
     Object.keys(pendingValDocs).forEach(function(id){
       var entry = pendingValDocs[id];
       if(mergeValDoc(id, entry.valutazioni, entry.json)) anyVal = true;
@@ -360,8 +386,13 @@ function attachListeners(){
       var entry = pendingAutoDocs[id];
       if(mergeAutoDoc(id, entry.valutazioni, entry.json)) anyAuto = true;
     });
+    Object.keys(pendingFisicoDocs).forEach(function(id){
+      var entry = pendingFisicoDocs[id];
+      if(mergeFisicoDoc(id, entry.misure, entry.json)) anyFisico = true;
+    });
     if(anyVal){ saveCacheSoon(); fireDataChange(KEY_VAL); }
     if(anyAuto){ saveCacheSoon(); fireDataChange(KEY_AUTO); }
+    if(anyFisico){ saveCacheSoon(); fireDataChange(KEY_FISICO); }
   }
 
   db.collection('sync_val_players').onSnapshot(function(snapshot){
@@ -394,6 +425,21 @@ function attachListeners(){
     if(any){ saveCacheSoon(); fireDataChange(KEY_AUTO); }
   }, function(err){ setStatus('error', err && err.message); });
 
+  db.collection('sync_fisico_players').onSnapshot(function(snapshot){
+    var any = false;
+    snapshot.docChanges().forEach(function(change){
+      var id = change.doc.id;
+      if(change.type === 'removed'){ delete cache.fisicoPlayers[id]; delete pendingFisicoDocs[id]; return; }
+      if(change.doc.metadata.hasPendingWrites) return;
+      var remote = change.doc.data() || {};
+      var remoteMisure = remote.misure || {};
+      var json = JSON.stringify(remoteMisure);
+      if(cache.fisicoPlayers[id] === json) return;
+      if(mergeFisicoDoc(id, remoteMisure, json)) any = true;
+    });
+    if(any){ saveCacheSoon(); fireDataChange(KEY_FISICO); }
+  }, function(err){ setStatus('error', err && err.message); });
+
   /* nota: 'FieldValue' e' referenziata solo nelle funzioni di push
      qui sotto, non qui: e' catturata via firebase.firestore.FieldValue
      al momento della scrittura per evitare problemi di ordine di
@@ -415,6 +461,7 @@ function flushOne(storageKey){
   if(storageKey === KEY_SQUADRA) pushSquadra();
   else if(storageKey === KEY_VAL) pushVal();
   else if(storageKey === KEY_AUTO) pushAuto();
+  else if(storageKey === KEY_FISICO) pushFisico();
 }
 function flushAllPending(){
   Object.keys(pendingDirty).forEach(function(k){ flushOne(k); });
@@ -431,11 +478,13 @@ function notifyPlayerDeleted(id){
   Object.keys(cache.valSlices).forEach(function(k){ if(k.indexOf(id + '|') === 0) delete cache.valSlices[k]; });
   delete cache.valReceived[id];
   delete cache.autoPlayers[id];
+  delete cache.fisicoPlayers[id];
   saveCacheSoon();
   if(!isConfigured() || !sdkReady) return;
   db.collection('sync_squadra_players').doc(id).delete().catch(function(){});
   db.collection('sync_val_players').doc(id).delete().catch(function(){});
   db.collection('sync_auto_players').doc(id).delete().catch(function(){});
+  db.collection('sync_fisico_players').doc(id).delete().catch(function(){});
 }
 
 function pushSquadra(force){
@@ -524,6 +573,22 @@ function pushAuto(force){
     cache.autoPlayers[p.id] = json; saveCacheSoon();
     db.collection('sync_auto_players').doc(p.id).set({
       valutazioni: p.valutazioni, updatedAt: FieldValue.serverTimestamp(), device: getDeviceId()
+    }, { merge: true }).then(function(){ setStatus('online', ''); })
+      .catch(function(err){ setStatus('offline', err && err.message); });
+  });
+}
+
+function pushFisico(force){
+  var parsed = readJson(KEY_FISICO);
+  if(!parsed) return;
+  var FieldValue = firebase.firestore.FieldValue;
+  (parsed.players || []).forEach(function(p){
+    if(!p.misure) return;
+    var json = JSON.stringify(p.misure);
+    if(!force && cache.fisicoPlayers[p.id] === json) return;
+    cache.fisicoPlayers[p.id] = json; saveCacheSoon();
+    db.collection('sync_fisico_players').doc(p.id).set({
+      misure: p.misure, updatedAt: FieldValue.serverTimestamp(), device: getDeviceId()
     }, { merge: true }).then(function(){ setStatus('online', ''); })
       .catch(function(err){ setStatus('offline', err && err.message); });
   });
