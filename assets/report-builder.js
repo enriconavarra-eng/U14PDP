@@ -198,6 +198,35 @@ var PAGE_CSS = ''+
 '.rb-qa-table td:first-child{font-size:12px;}'+
 '.rb-note{font-size:12px;color:#51666D;margin:8px 0 0 0;}'+
 '.rb-page-break{page-break-after:always;}'+
+/* Versione compatta usata SOLO dal riepilogo stampabile "solo
+   autovalutazioni" (window.RugbyReport.openSquadAutoReport): deve
+   stare, per quanto possibile, in un unico foglio per giocatore pur
+   elencando ogni singola domanda/risposta di ogni periodo compilato.
+   Tutte le regole sono annidate sotto .rb-auto-doc per non toccare
+   l'aspetto degli altri report (Riepilogo Squadra, PDF singolo
+   giocatore). */
+'.rb-auto-doc{font-size:11px;}'+
+'.rb-auto-doc .rb-player-header{margin:1px 0 3px 0;gap:8px;}'+
+'.rb-auto-doc .rb-photo{width:30px;height:30px;}'+
+'.rb-auto-doc .rb-player-header h2{font-size:16px;}'+
+'.rb-auto-doc .rb-meta{font-size:10px;}'+
+'.rb-auto-doc .rb-card{padding:5px 8px;margin-bottom:5px;break-inside:auto;}'+
+'.rb-auto-doc .rb-card h3{font-size:11.5px;margin:0 0 3px 0;}'+
+'.rb-auto-doc .rb-tag{font-size:8px;}'+
+/* I 4 gruppi di competenza affiancati su un'unica riga (invece di 2x2):
+   dimezza l'altezza occupata da ciascun periodo rispetto a impilarli,
+   il cambiamento con la maggiore resa nel far stare tutto in un foglio. */
+'.rb-auto-doc .rb-qa-groups{display:grid;grid-template-columns:repeat(4,1fr);gap:0 6px;}'+
+'.rb-auto-doc .rb-qa-group{margin-bottom:3px;break-inside:avoid;}'+
+'.rb-auto-doc .rb-qa-group h4{font-size:7.6px;margin:1px 0 1px 0;}'+
+'.rb-auto-doc .rb-qa-table{font-size:6.6px;line-height:1.05;}'+
+'.rb-auto-doc .rb-qa-table th,.rb-auto-doc .rb-qa-table td{padding:0.5px 2px;}'+
+'.rb-auto-doc .rb-qa-table td:first-child{font-size:6.6px;}'+
+'.rb-auto-doc .rb-qa-table td:last-child,.rb-auto-doc .rb-qa-table th:last-child{white-space:nowrap;}'+
+'.rb-auto-doc .rb-total{font-size:9.5px;margin-top:2px;}'+
+'.rb-auto-doc .rb-goals{font-size:9px;margin-top:2px;line-height:1.25;}'+
+'.rb-auto-doc .rb-goals p{margin:0 0 1px 0;}'+
+'.rb-auto-doc .rb-empty{font-size:10px;}'+
 '@media print{ .rb-toolbar{display:none;} body{background:#fff;} .rb-doc{max-width:none;padding:0;} }';
 
 function openReportWindow(title, innerHtml){
@@ -211,7 +240,7 @@ function openReportWindow(title, innerHtml){
     '<div class="rb-toolbar"><h1>'+esc(title)+'</h1>'+
     '<button onclick="window.print()">&#128424; Stampa / Salva PDF</button></div>'+
     '<div class="rb-doc">'+innerHtml+
-    '<p style="margin-top:24px;font-size:10.5px;color:#9AA;">Generato il '+esc(new Date().toLocaleDateString('it-IT'))+' — Rugby Club Pasian di Prato</p>'+
+    '<p style="margin-top:10px;font-size:9px;color:#9AA;">Generato il '+esc(new Date().toLocaleDateString('it-IT'))+' — Rugby Club Pasian di Prato</p>'+
     '</div></body></html>';
   win.document.open();
   win.document.write(doc);
@@ -251,15 +280,21 @@ function autoSkillGroupTableHtml(group){
 
 /* Pagina completa di un giocatore con la sola autovalutazione (senza
    la valutazione del tecnico ne' il confronto): TUTTI i periodi della
-   stagione (Settembre/Gennaio/Maggio), uno di seguito all'altro, cosi
-   che una sola pagina mostri l'intero percorso del ragazzo, non solo
-   il periodo filtrato a video. Per ciascun periodo elenca ogni singola
-   domanda con la risposta data dal ragazzo (non solo le medie per
-   area), piu' gli obiettivi e il ruolo desiderato dichiarati. Usata
-   dal riepilogo stampabile "solo autovalutazioni" qui sotto. */
+   stagione (Settembre/Gennaio/Maggio) compilati, uno di seguito
+   all'altro, cosi che una sola pagina mostri l'intero percorso del
+   ragazzo, non solo il periodo filtrato a video. Per ciascun periodo
+   elenca ogni singola domanda con la risposta data dal ragazzo (non
+   solo le medie per area), piu' gli obiettivi e il ruolo desiderato
+   dichiarati. Impaginazione compatta (vedi .rb-auto-doc in PAGE_CSS):
+   i due gruppi di competenze di ogni riga stanno affiancati e i
+   periodi senza alcun dato non occupano spazio, cosi' il tutto resta,
+   per quanto possibile, su un solo foglio per giocatore. Usata dal
+   riepilogo stampabile "solo autovalutazioni" qui sotto. */
 function autoOnlySectionHtml(player){
   var ED = window.EvalData;
   var html = playerHeaderHtml(player);
+  var anyPeriod = false;
+
   ED.PERIODS.forEach(function(per){
     var autoHas = ED.autoHasData(player.id, per.key);
     var autoTot = ED.autoTotalAverage(player.id, per.key);
@@ -267,26 +302,33 @@ function autoOnlySectionHtml(player){
     var goals = ED.autoGoals(player.id, per.key);
     var hasGoals = !!(goals.obiettivoPersonale || goals.obiettivoTecnico || goals.ruoloDesiderato);
 
+    /* Periodo senza alcun dato: salta del tutto la card, non occupa
+       spazio sul foglio (invece di un "Nessun dato" che costa righe). */
+    if(!autoHas && !hasGoals) return;
+    anyPeriod = true;
+
     html += '<div class="rb-card"><h3>'+esc(per.label)+' <span class="rb-tag">autovalutazione</span></h3>';
-    if(!autoHas && !hasGoals){
-      html += '<p class="rb-empty">Nessun dato per questo periodo.</p>';
+    if(autoHas){
+      html += '<div class="rb-qa-groups">';
+      skillGroups.forEach(function(g){ html += autoSkillGroupTableHtml(g); });
+      html += '</div>';
+      html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</strong></div>';
     } else {
-      if(autoHas){
-        skillGroups.forEach(function(g){ html += autoSkillGroupTableHtml(g); });
-        html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</strong></div>';
-      } else {
-        html += '<p class="rb-empty">Nessun punteggio inserito per questo periodo.</p>';
-      }
-      if(hasGoals){
-        html += '<div class="rb-goals">';
-        if(goals.obiettivoPersonale) html += '<p><strong>Obiettivo personale:</strong> '+esc(goals.obiettivoPersonale)+'</p>';
-        if(goals.obiettivoTecnico) html += '<p><strong>Obiettivo tecnico:</strong> '+esc(goals.obiettivoTecnico)+'</p>';
-        if(goals.ruoloDesiderato) html += '<p><strong>Ruolo desiderato:</strong> '+esc(goals.ruoloDesiderato)+'</p>';
-        html += '</div>';
-      }
+      html += '<p class="rb-empty">Nessun punteggio inserito per questo periodo.</p>';
+    }
+    if(hasGoals){
+      html += '<div class="rb-goals">';
+      if(goals.obiettivoPersonale) html += '<p><strong>Obiettivo personale:</strong> '+esc(goals.obiettivoPersonale)+'</p>';
+      if(goals.obiettivoTecnico) html += '<p><strong>Obiettivo tecnico:</strong> '+esc(goals.obiettivoTecnico)+'</p>';
+      if(goals.ruoloDesiderato) html += '<p><strong>Ruolo desiderato:</strong> '+esc(goals.ruoloDesiderato)+'</p>';
+      html += '</div>';
     }
     html += '</div>';
   });
+
+  if(!anyPeriod){
+    html += '<p class="rb-empty">Nessuna autovalutazione compilata per nessun periodo.</p>';
+  }
   return html;
 }
 
@@ -295,7 +337,8 @@ function autoOnlySectionHtml(player){
    completo nei tre periodi: resta separato dal Riepilogo Squadra (che
    confronta anche con i tecnici, periodo per periodo). */
 function openSquadAutoReport(players, seasonLabel){
-  var html = '<h2 style="font-family:inherit;margin-top:0;">Autovalutazioni Squadra'+(seasonLabel?' — '+esc(seasonLabel):'')+'</h2>';
+  var html = '<div class="rb-auto-doc">';
+  html += '<h2 style="font-family:inherit;margin:0 0 4px 0;font-size:15px;">Autovalutazioni Squadra'+(seasonLabel?' — '+esc(seasonLabel):'')+'</h2>';
   if(players.length===0){
     html += '<p class="rb-empty">Nessun giocatore in rosa.</p>';
   }
@@ -303,6 +346,7 @@ function openSquadAutoReport(players, seasonLabel){
     html += '<div>'+autoOnlySectionHtml(player)+'</div>';
     if(i < players.length-1) html += '<div class="rb-page-break"></div>';
   });
+  html += '</div>';
   openReportWindow('Autovalutazioni Squadra', html);
 }
 
