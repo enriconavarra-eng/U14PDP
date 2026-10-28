@@ -144,6 +144,57 @@ var AUTO_SKILL_IDS = {
   phys: ['fis_accelerazione','fis_vel_massima','fis_cambi_direzione','fis_contatto','fis_rialzata','fis_recupero','fis_stanchezza'],
   comp: ['ts_concentrazione','ts_impegno','ts_incoraggiamento','ts_regole','ts_rispetto','ts_ascolto','ts_calma']
 };
+/* Testo completo di ogni domanda dell'autovalutazione (allineato alla
+   scheda Giocatore), usato per stampare domanda-per-domanda, non solo
+   le medie per area. */
+var AUTO_SKILL_NAMES = {
+  tec_pass2mani: 'Passo il pallone preciso con due mani',
+  tec_ricezione_mov: 'Ricevo il pallone senza fermarmi',
+  tec_presentazione: 'Dopo il contatto metto il pallone a disposizione',
+  tec_vita_contatto: 'Faccio vivere il pallone a contatto',
+  tec_calcio_precisione: 'Calcio il pallone con precisione',
+  tec_presa_volo: 'Prendo il pallone al volo su un calcio',
+  tec_placc_sicurezza: 'Placco in sicurezza con la tecnica corretta',
+  tec_placc_paura: 'Placco senza paura',
+  let_spazio_prericezione: 'Prima di ricevere guardo dov\'e\' lo spazio libero',
+  let_sostegno: 'Mi muovo per aiutare il compagno con la palla',
+  let_spazio_avanzare: 'Quando ho la palla in mano riesco a trovare lo spazio libero e avanzare',
+  let_posizione_campo: 'Corro per mettermi in una posizione utile in campo',
+  let_allineamento: 'In difesa mi allineo ai compagni',
+  let_bersaglio: 'In difesa capisco su chi difendere',
+  let_comunicazione: 'In difesa comunico con i compagni',
+  let_salita: 'In difesa avanzo per andare a prendere l\'avversario',
+  fis_accelerazione: 'Riesco a scattare veloce sui primi metri',
+  fis_vel_massima: 'Riesco a raggiungere rapidamente la massima velocita\'',
+  fis_cambi_direzione: 'Riesco a cambiare direzione rapidamente restando in equilibrio',
+  fis_contatto: 'Reggo il confronto fisico sul contatto',
+  fis_rialzata: 'Riesco a rialzarmi velocemente dopo essere andato a terra',
+  fis_recupero: 'Tra uno sforzo e l\'altro recupero rapidamente fiato e forze',
+  fis_stanchezza: 'Arrivo a fine allenamento senza essere troppo stanco',
+  ts_concentrazione: 'Riesco a stare concentrato per tutta la durata dell\'allenamento',
+  ts_impegno: 'Mi impegno al massimo anche negli esercizi che mi piacciono meno',
+  ts_incoraggiamento: 'Aiuto e incoraggio i miei compagni in campo',
+  ts_regole: 'Rispetto le regole del gioco, l\'arbitro e gli avversari',
+  ts_rispetto: 'Rispetto i compagni e lo staff',
+  ts_ascolto: 'Ascolto e provo ad applicare le correzioni',
+  ts_calma: 'Riesco a stare calmo quando sbaglio e torno subito concentrato'
+};
+/* Scala di frequenza usata nella scheda Autovalutazione (invariata):
+   ogni punteggio 1-5 corrisponde a una risposta testuale, per poter
+   stampare la "risposta" del ragazzo e non solo il numero. */
+var FREQ_LEVELS = {
+  1: { emo:'😕', band:'0-2/10', lbl:'Quasi mai' },
+  2: { emo:'😐', band:'3-4/10', lbl:'Raramente' },
+  3: { emo:'🙂', band:'5-6/10', lbl:'A volte' },
+  4: { emo:'😃', band:'7-8/10', lbl:'Spesso' },
+  5: { emo:'🤩', band:'9-10/10', lbl:'Quasi sempre' }
+};
+function freqAnswerLabel(value){
+  var n = Number(value);
+  var lvl = FREQ_LEVELS[n];
+  if(!lvl) return null;
+  return lvl.lbl + ' (' + lvl.band + ')';
+}
 function autoPlayerRaw(playerId){
   return readRaw(AUTO_KEY).find(function(p){return p.id===playerId;}) || null;
 }
@@ -171,6 +222,30 @@ function autoHasData(playerId, periodKey){
   var p = autoPlayerRaw(playerId);
   if(!p || !p.valutazioni || !p.valutazioni[periodKey]) return false;
   return Object.keys(p.valutazioni[periodKey].scores || {}).length > 0;
+}
+/* Ogni singola domanda dell'autovalutazione con la relativa risposta,
+   raggruppate per area (nello stesso ordine di AUTO_GROUPS): usata per
+   stampare il dettaglio completo domanda-per-domanda, non solo le
+   medie per area. */
+function autoSkillAnswers(playerId, periodKey){
+  var p = autoPlayerRaw(playerId);
+  var scores = (p && p.valutazioni && p.valutazioni[periodKey] && p.valutazioni[periodKey].scores) || {};
+  return AUTO_GROUPS.map(function(g){
+    var ids = AUTO_SKILL_IDS[g.key] || [];
+    return {
+      key: g.key, label: g.label, color: g.color,
+      skills: ids.map(function(id){
+        var raw = scores[id];
+        var hasAnswer = raw!==undefined && raw!==null && raw!=='';
+        return {
+          id: id,
+          name: AUTO_SKILL_NAMES[id] || id,
+          value: hasAnswer ? Number(raw) : null,
+          answerLabel: hasAnswer ? freqAnswerLabel(raw) : null
+        };
+      })
+    };
+  });
 }
 function autoGoals(playerId, periodKey){
   var p = autoPlayerRaw(playerId);
@@ -217,6 +292,7 @@ window.EvalData = {
   autoGroupAverages: autoGroupAverages,
   autoTotalAverage: autoTotalAverage,
   autoHasData: autoHasData,
+  autoSkillAnswers: autoSkillAnswers,
   autoGoals: autoGoals,
   fisicoMisure: fisicoMisure,
   fisicoSeries: fisicoSeries,

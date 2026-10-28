@@ -192,6 +192,10 @@ var PAGE_CSS = ''+
 '.rb-table th,.rb-table td{padding:7px 8px;text-align:center;border-bottom:1px solid #DDD1B8;}'+
 '.rb-table th:first-child,.rb-table td:first-child{text-align:left;}'+
 '.rb-table th{color:#51666D;font-weight:600;font-size:11px;text-transform:uppercase;}'+
+'.rb-qa-group{margin-bottom:14px;break-inside:avoid;}'+
+'.rb-qa-group:last-child{margin-bottom:0;}'+
+'.rb-qa-group h4{font-size:11.5px;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:.3px;}'+
+'.rb-qa-table td:first-child{font-size:12px;}'+
 '.rb-note{font-size:12px;color:#51666D;margin:8px 0 0 0;}'+
 '.rb-page-break{page-break-after:always;}'+
 '@media print{ .rb-toolbar{display:none;} body{background:#fff;} .rb-doc{max-width:none;padding:0;} }';
@@ -232,20 +236,34 @@ function openSquadReport(players, periodKey, seasonLabel){
   openReportWindow('Riepilogo Squadra', html);
 }
 
+/* Tabella domanda/risposta per un gruppo di competenze (una riga per
+   ciascuna domanda dell'autovalutazione, con la risposta testuale del
+   ragazzo, non solo il numero), usata dal dettaglio completo qui sotto. */
+function autoSkillGroupTableHtml(group){
+  var rows = group.skills.map(function(s){
+    return '<tr><td>'+esc(s.name)+'</td>'+
+      '<td class="rb-mono" style="color:'+scoreColor(s.value)+'">'+(s.answerLabel ? esc(s.answerLabel) : '-')+'</td></tr>';
+  }).join('');
+  return '<div class="rb-qa-group"><h4 style="color:'+group.color+'">'+esc(group.label)+'</h4>'+
+    '<table class="rb-table rb-qa-table"><thead><tr><th>Domanda</th><th>Risposta</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+  '</div>';
+}
+
 /* Pagina completa di un giocatore con la sola autovalutazione (senza
    la valutazione del tecnico ne' il confronto): TUTTI i periodi della
    stagione (Settembre/Gennaio/Maggio), uno di seguito all'altro, cosi
    che una sola pagina mostri l'intero percorso del ragazzo, non solo
-   il periodo filtrato a video. Include anche gli obiettivi e il ruolo
-   desiderato dichiarati per ciascun periodo. Usata dal riepilogo
-   stampabile "solo autovalutazioni" qui sotto. */
+   il periodo filtrato a video. Per ciascun periodo elenca ogni singola
+   domanda con la risposta data dal ragazzo (non solo le medie per
+   area), piu' gli obiettivi e il ruolo desiderato dichiarati. Usata
+   dal riepilogo stampabile "solo autovalutazioni" qui sotto. */
 function autoOnlySectionHtml(player){
   var ED = window.EvalData;
   var html = playerHeaderHtml(player);
   ED.PERIODS.forEach(function(per){
     var autoHas = ED.autoHasData(player.id, per.key);
-    var autoAvgs = ED.autoGroupAverages(player.id, per.key);
     var autoTot = ED.autoTotalAverage(player.id, per.key);
+    var skillGroups = ED.autoSkillAnswers(player.id, per.key);
     var goals = ED.autoGoals(player.id, per.key);
     var hasGoals = !!(goals.obiettivoPersonale || goals.obiettivoTecnico || goals.ruoloDesiderato);
 
@@ -254,7 +272,7 @@ function autoOnlySectionHtml(player){
       html += '<p class="rb-empty">Nessun dato per questo periodo.</p>';
     } else {
       if(autoHas){
-        ED.AUTO_GROUPS.forEach(function(g){ html += barRow(g.label, autoAvgs[g.key], g.color); });
+        skillGroups.forEach(function(g){ html += autoSkillGroupTableHtml(g); });
         html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</strong></div>';
       } else {
         html += '<p class="rb-empty">Nessun punteggio inserito per questo periodo.</p>';
@@ -311,6 +329,10 @@ var CARD_CSS = ''+
 '.rb-table th,.rb-table td{padding:7px 8px;text-align:center;border-bottom:1px solid #DDD1B8;}'+
 '.rb-table th:first-child,.rb-table td:first-child{text-align:left;}'+
 '.rb-table th{color:#51666D;font-weight:600;font-size:11px;text-transform:uppercase;}'+
+'.rb-qa-group{margin-bottom:14px;}'+
+'.rb-qa-group:last-child{margin-bottom:0;}'+
+'.rb-qa-group h4{font-size:11.5px;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:.3px;}'+
+'.rb-qa-table td:first-child{font-size:12px;}'+
 '.rb-note{font-size:12px;color:#51666D;margin:8px 0 0 0;}'+
 '.rb-period-banner{display:inline-block;background:#EDE4D2;color:#00212F;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;margin:8px 0 14px 0;}';
 
