@@ -23,8 +23,8 @@ var PERIODS = [
 /* --- Tassonomia Scheda Valutazione (allenatore) --- */
 var VAL_GROUPS = [
   {key:'tech', label:'Capacita Tecniche', color:'#2E75B6', short:'TEC'},
-  {key:'phys', label:'Capacita Fisiche', color:'#C55A11', short:'FIS'},
   {key:'cog', label:'Capacita Cognitive', color:'#548235', short:'COG'},
+  {key:'phys', label:'Capacita Fisiche', color:'#C55A11', short:'FIS'},
   {key:'comp', label:'Capacita Comportamentali', color:'#7030A0', short:'COM'}
 ];
 /* --- Tassonomia Autovalutazione (giocatore) --- */
