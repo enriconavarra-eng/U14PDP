@@ -232,46 +232,57 @@ function openSquadReport(players, periodKey, seasonLabel){
   openReportWindow('Riepilogo Squadra', html);
 }
 
-/* Sezione di un giocatore con la sola autovalutazione (senza la
-   valutazione del tecnico ne' il confronto), usata dal riepilogo
+/* Pagina completa di un giocatore con la sola autovalutazione (senza
+   la valutazione del tecnico ne' il confronto): TUTTI i periodi della
+   stagione (Settembre/Gennaio/Maggio), uno di seguito all'altro, cosi
+   che una sola pagina mostri l'intero percorso del ragazzo, non solo
+   il periodo filtrato a video. Include anche gli obiettivi e il ruolo
+   desiderato dichiarati per ciascun periodo. Usata dal riepilogo
    stampabile "solo autovalutazioni" qui sotto. */
-function autoOnlySectionHtml(player, periodKey){
+function autoOnlySectionHtml(player){
   var ED = window.EvalData;
-  var periodLbl = (ED.PERIODS.find(function(p){return p.key===periodKey;})||{}).label || periodKey;
-  var autoHas = ED.autoHasData(player.id, periodKey);
-  var autoAvgs = ED.autoGroupAverages(player.id, periodKey);
-  var autoTot = ED.autoTotalAverage(player.id, periodKey);
-
   var html = playerHeaderHtml(player);
-  html += '<div class="rb-period-banner">Periodo: '+esc(periodLbl)+'</div>';
-  html += '<div class="rb-card"><h3>Autovalutazione <span class="rb-tag">giocatore</span></h3>';
-  if(!autoHas){
-    html += '<p class="rb-empty">Nessun dato per questo periodo.</p>';
-  } else {
-    ED.AUTO_GROUPS.forEach(function(g){ html += barRow(g.label, autoAvgs[g.key], g.color); });
-    html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</strong></div>';
-    var goals = ED.autoGoals(player.id, periodKey);
-    if(goals.obiettivoPersonale || goals.obiettivoTecnico){
-      html += '<div class="rb-goals">';
-      if(goals.obiettivoPersonale) html += '<p><strong>Obiettivo personale:</strong> '+esc(goals.obiettivoPersonale)+'</p>';
-      if(goals.obiettivoTecnico) html += '<p><strong>Obiettivo tecnico:</strong> '+esc(goals.obiettivoTecnico)+'</p>';
-      html += '</div>';
+  ED.PERIODS.forEach(function(per){
+    var autoHas = ED.autoHasData(player.id, per.key);
+    var autoAvgs = ED.autoGroupAverages(player.id, per.key);
+    var autoTot = ED.autoTotalAverage(player.id, per.key);
+    var goals = ED.autoGoals(player.id, per.key);
+    var hasGoals = !!(goals.obiettivoPersonale || goals.obiettivoTecnico || goals.ruoloDesiderato);
+
+    html += '<div class="rb-card"><h3>'+esc(per.label)+' <span class="rb-tag">autovalutazione</span></h3>';
+    if(!autoHas && !hasGoals){
+      html += '<p class="rb-empty">Nessun dato per questo periodo.</p>';
+    } else {
+      if(autoHas){
+        ED.AUTO_GROUPS.forEach(function(g){ html += barRow(g.label, autoAvgs[g.key], g.color); });
+        html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</strong></div>';
+      } else {
+        html += '<p class="rb-empty">Nessun punteggio inserito per questo periodo.</p>';
+      }
+      if(hasGoals){
+        html += '<div class="rb-goals">';
+        if(goals.obiettivoPersonale) html += '<p><strong>Obiettivo personale:</strong> '+esc(goals.obiettivoPersonale)+'</p>';
+        if(goals.obiettivoTecnico) html += '<p><strong>Obiettivo tecnico:</strong> '+esc(goals.obiettivoTecnico)+'</p>';
+        if(goals.ruoloDesiderato) html += '<p><strong>Ruolo desiderato:</strong> '+esc(goals.ruoloDesiderato)+'</p>';
+        html += '</div>';
+      }
     }
-  }
-  html += '</div>';
+    html += '</div>';
+  });
   return html;
 }
 
 /* Riepilogo stampabile con le sole autovalutazioni di tutti i
-   giocatori della rosa, una pagina per giocatore: resta separato dal
-   Riepilogo Squadra (che confronta anche con i tecnici). */
-function openSquadAutoReport(players, periodKey, seasonLabel){
+   giocatori della rosa, una pagina per giocatore con il percorso
+   completo nei tre periodi: resta separato dal Riepilogo Squadra (che
+   confronta anche con i tecnici, periodo per periodo). */
+function openSquadAutoReport(players, seasonLabel){
   var html = '<h2 style="font-family:inherit;margin-top:0;">Autovalutazioni Squadra'+(seasonLabel?' — '+esc(seasonLabel):'')+'</h2>';
   if(players.length===0){
     html += '<p class="rb-empty">Nessun giocatore in rosa.</p>';
   }
   players.forEach(function(player, i){
-    html += '<div>'+autoOnlySectionHtml(player, periodKey)+'</div>';
+    html += '<div>'+autoOnlySectionHtml(player)+'</div>';
     if(i < players.length-1) html += '<div class="rb-page-break"></div>';
   });
   openReportWindow('Autovalutazioni Squadra', html);

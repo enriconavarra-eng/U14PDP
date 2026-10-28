@@ -173,14 +173,16 @@ document.getElementById('pdfSquadBtn').addEventListener('click', function(){
 });
 
 /* Riepilogo stampabile delle sole autovalutazioni: una pagina per
-   ciascun giocatore, senza la valutazione del tecnico ne' il
-   confronto, per avere a parte il quadro completo di come i ragazzi
-   si vedono. */
+   ciascun giocatore con TUTTI i periodi della stagione, i suoi
+   obiettivi e il ruolo desiderato, senza la valutazione del tecnico
+   ne' il confronto, per avere a parte il quadro completo di come i
+   ragazzi si vedono nel corso dell'anno (non e' legato al periodo
+   selezionato nei filtri qui sopra). */
 document.getElementById('pdfAutoSquadBtn').addEventListener('click', function(){
   var seasonId = getSeasonId();
   var players = SS.getPlayers(seasonId);
   var season = SS.getSeasons().find(function(s){return s.id===seasonId;});
-  window.RugbyReport.openSquadAutoReport(players, state.period, season ? season.label : '');
+  window.RugbyReport.openSquadAutoReport(players, season ? season.label : '');
 });
 
 if('serviceWorker' in navigator){
