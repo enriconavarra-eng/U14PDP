@@ -58,8 +58,8 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
 .pdf-btn{background:var(--surface-2);border:1px solid var(--pitch-line);color:var(--ink);padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer;}
 .pdf-btn:hover{background:var(--gold-soft);}
 .empty-msg{text-align:center;color:var(--ink-soft);padding:40px 16px;}
-.section-title{font-family:var(--font-display);font-size:18px;margin:30px 0 4px 0;color:var(--pitch-dark);}
-.section-note{font-size:12.5px;color:var(--ink-soft);margin:0 0 14px 0;line-height:1.5;}
+.auto-squad-btn{background:var(--gold)!important;color:#fff;border:none;padding:10px 16px;border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
+.auto-squad-btn:hover{opacity:.92;}
 </style>
 </head>
 <body>
@@ -82,14 +82,11 @@ td.mono{font-family:var(--font-mono);font-weight:700;}
     <label>Periodo</label>
     <div class="period-switch" id="periodSwitch"></div>
     <div class="spacer"></div>
+    <button class="auto-squad-btn" id="pdfAutoSquadBtn">&#128424; Stampa Autovalutazioni</button>
     <button class="pdf-squad-btn" id="pdfSquadBtn">&#128424; Scarica PDF Squadra</button>
   </div>
 
   <div id="tableWrap"></div>
-
-  <h2 class="section-title">Autovalutazioni — riepilogo completo</h2>
-  <div class="section-note">Media che ciascun giocatore si e' dato per area di competenza nella propria autovalutazione, indipendente dal confronto con i tecnici qui sopra.</div>
-  <div id="autoDetailWrap"></div>
 </div>
 
 <script src="../assets/squadra-store.js"></script>
@@ -125,7 +122,7 @@ function renderSeasons(){
     SS.setActiveSeasonId(e.target.value);
     var url = new URL(window.location.href); url.searchParams.set('season', e.target.value);
     window.history.replaceState(null,'',url);
-    renderAll();
+    renderTable();
   });
 }
 function renderPeriods(){
@@ -134,7 +131,7 @@ function renderPeriods(){
     return '<button data-period="'+p.key+'" class="'+(state.period===p.key?'active':'')+'">'+p.label+'</button>';
   }).join('');
   Array.prototype.forEach.call(el.querySelectorAll('button'), function(btn){
-    btn.addEventListener('click', function(){ state.period = btn.getAttribute('data-period'); renderPeriods(); renderAll(); });
+    btn.addEventListener('click', function(){ state.period = btn.getAttribute('data-period'); renderPeriods(); renderTable(); });
   });
 }
 
@@ -168,41 +165,22 @@ function renderTable(){
   });
 }
 
-/* Tabella separata, dedicata solo alle autovalutazioni: una colonna per
-   ciascuna area di competenza del giocatore (nello stesso ordine usato
-   nella scheda Autovalutazione), cosi' il quadro completo di come i
-   ragazzi si vedono resta distinto dal confronto con i tecnici sopra. */
-function renderAutoDetailTable(){
-  var seasonId = getSeasonId();
-  var players = SS.getPlayers(seasonId);
-  var wrap = document.getElementById('autoDetailWrap');
-  if(players.length===0){ wrap.innerHTML = ''; return; }
-  var groups = ED.AUTO_GROUPS;
-  var headCols = groups.map(function(g){ return '<th title="'+escapeHtml(g.label)+'">'+escapeHtml(g.short)+'</th>'; }).join('');
-  var rows = players.map(function(p){
-    var avgs = ED.autoGroupAverages(p.id, state.period);
-    var tot = ED.autoTotalAverage(p.id, state.period);
-    var avatar = p.foto ? '<div class="avatar" style="background-image:url(&quot;'+p.foto+'&quot;)"></div>' : '<div class="avatar">'+(SS.getInitials(p.nome)||'?')+'</div>';
-    var cells = groups.map(function(g){
-      var v = avgs[g.key];
-      return '<td class="mono" style="color:'+scoreColor(v)+'">'+fmt(v)+'</td>';
-    }).join('');
-    return '<tr>'+
-      '<td><div class="name-cell">'+avatar+'<span>'+escapeHtml(p.nome)+'</span></div></td>'+
-      cells+
-      '<td class="mono" style="color:'+scoreColor(tot)+';font-weight:800;">'+fmt(tot)+'</td>'+
-    '</tr>';
-  }).join('');
-  wrap.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Giocatore</th>'+headCols+'<th>Media</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-}
-
-function renderAll(){ renderTable(); renderAutoDetailTable(); }
-
 document.getElementById('pdfSquadBtn').addEventListener('click', function(){
   var seasonId = getSeasonId();
   var players = SS.getPlayers(seasonId);
   var season = SS.getSeasons().find(function(s){return s.id===seasonId;});
   window.RugbyReport.openSquadReport(players, state.period, season ? season.label : '');
+});
+
+/* Riepilogo stampabile delle sole autovalutazioni: una pagina per
+   ciascun giocatore, senza la valutazione del tecnico ne' il
+   confronto, per avere a parte il quadro completo di come i ragazzi
+   si vedono. */
+document.getElementById('pdfAutoSquadBtn').addEventListener('click', function(){
+  var seasonId = getSeasonId();
+  var players = SS.getPlayers(seasonId);
+  var season = SS.getSeasons().find(function(s){return s.id===seasonId;});
+  window.RugbyReport.openSquadAutoReport(players, state.period, season ? season.label : '');
 });
 
 if('serviceWorker' in navigator){
@@ -211,16 +189,16 @@ if('serviceWorker' in navigator){
 
 renderSeasons();
 renderPeriods();
-renderAll();
+renderTable();
 
 /* Se i dati cambiano da un altro dispositivo (rosa, valutazioni o
-   autovalutazioni), ridisegna le tabelle con i valori aggiornati. */
+   autovalutazioni), ridisegna la tabella con i valori aggiornati. */
 if(window.SquadraStore && window.SquadraStore.onChange){
-  window.SquadraStore.onChange(function(){ renderSeasons(); renderAll(); });
+  window.SquadraStore.onChange(function(){ renderSeasons(); renderTable(); });
 }
 if(window.RugbyCloudSync){
-  window.RugbyCloudSync.onDataChange('rugbyU14_valutazioni_v2', renderAll);
-  window.RugbyCloudSync.onDataChange('rugbyU14_autovalutazione_v1', renderAll);
+  window.RugbyCloudSync.onDataChange('rugbyU14_valutazioni_v2', renderTable);
+  window.RugbyCloudSync.onDataChange('rugbyU14_autovalutazione_v1', renderTable);
   window.RugbyCloudSync.mountStatusBadge('cloudStatusHost');
 }
 

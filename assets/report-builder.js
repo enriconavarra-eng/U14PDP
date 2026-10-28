@@ -232,6 +232,51 @@ function openSquadReport(players, periodKey, seasonLabel){
   openReportWindow('Riepilogo Squadra', html);
 }
 
+/* Sezione di un giocatore con la sola autovalutazione (senza la
+   valutazione del tecnico ne' il confronto), usata dal riepilogo
+   stampabile "solo autovalutazioni" qui sotto. */
+function autoOnlySectionHtml(player, periodKey){
+  var ED = window.EvalData;
+  var periodLbl = (ED.PERIODS.find(function(p){return p.key===periodKey;})||{}).label || periodKey;
+  var autoHas = ED.autoHasData(player.id, periodKey);
+  var autoAvgs = ED.autoGroupAverages(player.id, periodKey);
+  var autoTot = ED.autoTotalAverage(player.id, periodKey);
+
+  var html = playerHeaderHtml(player);
+  html += '<div class="rb-period-banner">Periodo: '+esc(periodLbl)+'</div>';
+  html += '<div class="rb-card"><h3>Autovalutazione <span class="rb-tag">giocatore</span></h3>';
+  if(!autoHas){
+    html += '<p class="rb-empty">Nessun dato per questo periodo.</p>';
+  } else {
+    ED.AUTO_GROUPS.forEach(function(g){ html += barRow(g.label, autoAvgs[g.key], g.color); });
+    html += '<div class="rb-total">Media totale: <strong style="color:'+scoreColor(autoTot)+'">'+fmt(autoTot)+'</strong></div>';
+    var goals = ED.autoGoals(player.id, periodKey);
+    if(goals.obiettivoPersonale || goals.obiettivoTecnico){
+      html += '<div class="rb-goals">';
+      if(goals.obiettivoPersonale) html += '<p><strong>Obiettivo personale:</strong> '+esc(goals.obiettivoPersonale)+'</p>';
+      if(goals.obiettivoTecnico) html += '<p><strong>Obiettivo tecnico:</strong> '+esc(goals.obiettivoTecnico)+'</p>';
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+/* Riepilogo stampabile con le sole autovalutazioni di tutti i
+   giocatori della rosa, una pagina per giocatore: resta separato dal
+   Riepilogo Squadra (che confronta anche con i tecnici). */
+function openSquadAutoReport(players, periodKey, seasonLabel){
+  var html = '<h2 style="font-family:inherit;margin-top:0;">Autovalutazioni Squadra'+(seasonLabel?' — '+esc(seasonLabel):'')+'</h2>';
+  if(players.length===0){
+    html += '<p class="rb-empty">Nessun giocatore in rosa.</p>';
+  }
+  players.forEach(function(player, i){
+    html += '<div>'+autoOnlySectionHtml(player, periodKey)+'</div>';
+    if(i < players.length-1) html += '<div class="rb-page-break"></div>';
+  });
+  openReportWindow('Autovalutazioni Squadra', html);
+}
+
 /* Sottoinsieme di stili riusabile dalle pagine che incorporano
    playerSectionHtml() nel proprio DOM (es. Confronto), senza aprire
    una finestra di stampa separata. */
@@ -261,6 +306,7 @@ var CARD_CSS = ''+
 window.RugbyReport = {
   openPlayerReport: openPlayerReport,
   openSquadReport: openSquadReport,
+  openSquadAutoReport: openSquadAutoReport,
   playerSectionHtml: playerSectionHtml,
   cardCss: CARD_CSS
 };
